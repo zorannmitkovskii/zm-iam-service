@@ -3,19 +3,7 @@ server:
 spring:
   application:
     name: IAM-Service
-  datasource:
-    url: jdbc:postgresql://localhost:5432/iam_db
-    username: user
-    password: pass
-    driver-class-name: org.postgresql.Driver
-  jpa:
-    hibernate:
-      ddl-auto: update
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
-  flyway:
-    enabled: true
+
 
 keycloak:
   auth-server-url: http://localhost:8181
