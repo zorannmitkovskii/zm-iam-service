@@ -9,9 +9,9 @@
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>zm.wedding.planner</groupId>
-	<artifactId>IAM-Service</artifactId>
+	<artifactId>iam-service</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>IAM-Service</name>
+	<name>IAM Service</name>
 	<description>Authentication &amp; IAM Service</description>
 	<url/>
 	<licenses>
@@ -47,8 +47,6 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
 		</dependency>
-
-		<!-- Spring Boot Starter Data JPA -->
 
 		<!-- PostgreSQL Driver -->
 		<dependency>
