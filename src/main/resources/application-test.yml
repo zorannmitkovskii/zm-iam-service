@@ -1,0 +1,16 @@
+# Test profile — used by @ActiveProfiles("test") tests. For unit tests that
+# don't need a DB, Spring picks up an in-memory H2 via testcompile. For
+# integration tests, Testcontainers provides Postgres dynamically (see IT).
+spring:
+  main:
+    allow-bean-definition-overriding: true
+  flyway:
+    enabled: true
+
+server:
+  port: 0   # random port for tests
+
+logging:
+  level:
+    root: WARN
+    org.ivyinc.iam: INFO

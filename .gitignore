@@ -1,0 +1,20 @@
+target/
+*.jar
+*.war
+
+# Maven wrapper — generate locally with `mvn wrapper:wrapper`, we intentionally
+# keep the jar out of git per project convention.
+.mvn/wrapper/maven-wrapper.jar
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+
+# Local env
+.env
+.env.local
+application-local-secret.yml

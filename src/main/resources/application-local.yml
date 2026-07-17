@@ -1,0 +1,15 @@
+# Local development profile.
+# Overrides for the shared Postgres run from the monorepo root compose.
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/iam_db
+    username: iam_user
+    password: iam_pass
+
+  jpa:
+    show-sql: true
+
+logging:
+  level:
+    org.springframework: INFO
+    org.ivyinc.iam: DEBUG
