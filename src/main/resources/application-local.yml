@@ -9,6 +9,15 @@ spring:
   jpa:
     show-sql: true
 
+# Local Keycloak defaults — pointing at the root docker-compose Keycloak
+# (localhost:8181 → container port 8080). The admin-service client + secret
+# must exist in the master realm before IAM starts; see zm-iam-service/README.md.
+iam:
+  keycloak:
+    base-url: ${KEYCLOAK_BASE_URL:http://localhost:8181}
+    admin-client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:admin-service}
+    admin-client-secret: ${KEYCLOAK_ADMIN_CLIENT_SECRET:change-me-local-only}
+
 logging:
   level:
     org.springframework: INFO

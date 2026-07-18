@@ -1,7 +1,9 @@
 package org.ivyinc.iam;
 
+import org.ivyinc.iam.keycloak.config.KeycloakProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 
 /**
  * Entry point for zm-iam-service — the central Identity and Access Management
@@ -11,6 +13,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * in the monorepo root for the full spec.
  */
 @SpringBootApplication
+@ConfigurationPropertiesScan(basePackageClasses = KeycloakProperties.class)
 public class IvyIamApplication {
 
     public static void main(String[] args) {

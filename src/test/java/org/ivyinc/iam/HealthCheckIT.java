@@ -46,6 +46,14 @@ class HealthCheckIT {
         registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
+
+        // Dummy Keycloak props so KeycloakAdminClientProvider's @PostConstruct
+        // succeeds. Self-bootstrap disabled so the health test does NOT need a
+        // live Keycloak — see SelfBootstrapIT for the Keycloak-integrated path.
+        registry.add("iam.keycloak.base-url", () -> "http://localhost:1");
+        registry.add("iam.keycloak.admin-client-id", () -> "dummy");
+        registry.add("iam.keycloak.admin-client-secret", () -> "dummy");
+        registry.add("iam.keycloak.self-bootstrap-enabled", () -> "false");
     }
 
     @Autowired MockMvc mockMvc;

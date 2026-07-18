@@ -60,3 +60,16 @@ logging:
   level:
     root: INFO
     org.hibernate.SQL: WARN
+
+# ── Keycloak integration ─────────────────────────────────────────────
+# All fields sanitized at startup (see KeycloakProperties.normalize()) so
+# trailing whitespace / stray quotes in the env vars don't produce 401s.
+iam:
+  keycloak:
+    base-url: ${KEYCLOAK_BASE_URL}
+    admin-client-id: ${KEYCLOAK_ADMIN_CLIENT_ID}
+    admin-client-secret: ${KEYCLOAK_ADMIN_CLIENT_SECRET}
+    admin-realm: ${KEYCLOAK_ADMIN_REALM:master}
+    self-bootstrap-enabled: ${IAM_SELF_BOOTSTRAP_ENABLED:true}
+    zm-services-realm: ${IAM_ZM_SERVICES_REALM:zm-services}
+    iam-client-role: ${IAM_IAM_CLIENT_ROLE:iam-client}

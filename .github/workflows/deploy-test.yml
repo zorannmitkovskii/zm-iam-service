@@ -1,0 +1,91 @@
+name: Deploy IAM to DigitalOcean (Test)
+
+# Same shape as ivy-events-be/deploy-dev.yml — build image, push to Docker
+# Hub, SSH into the droplet, docker run against the shared ivy-net + env
+# file. The only IAM-specific additions are:
+#   1. Idempotent iam_db + iam_user bootstrap step on the shared Postgres.
+#   2. `environment: test` gate that requires a manual reviewer approval
+#      in GitHub UI before the deploy job runs.
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  build-and-push:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+      - name: Build and Push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: zmtechlabs/zm-iam-service:latest
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    # Manual approval gate. Configure reviewers in:
+    #   Settings → Environments → `test` → Required reviewers.
+    environment: test
+    steps:
+      - name: Deploy IAM (TEST)
+        uses: appleboy/ssh-action@v0.1.9
+        with:
+          host: ${{ secrets.DROPLET_IP }}
+          username: root
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          script: |
+            set -e
+
+            echo "🔧 Ensure ivy-net network exists"
+            docker network inspect ivy-net >/dev/null 2>&1 || docker network create ivy-net
+
+            echo "🗄️ Ensure iam_db + iam_user exist on shared Postgres"
+            # Idempotent — never touches an existing role/database, only
+            # creates what's missing. Safe to re-run on every deploy.
+            docker exec -i -u postgres "${{ secrets.POSTGRES_CONTAINER || 'zm-postgres' }}" \
+              psql -U postgres -v ON_ERROR_STOP=1 \
+              -v iam_user="${{ secrets.IAM_DB_USER || 'iam_user' }}" \
+              -v iam_password="${{ secrets.IAM_DB_PASSWORD || 'iam_pass' }}" \
+              -v iam_db="${{ secrets.IAM_DB_NAME || 'iam_db' }}" <<'SQL'
+            DO $$
+            BEGIN
+              IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'iam_user') THEN
+                EXECUTE format('CREATE ROLE %I WITH LOGIN PASSWORD %L', :'iam_user', :'iam_password');
+              END IF;
+            END $$;
+            SELECT format('CREATE DATABASE %I OWNER %I', :'iam_db', :'iam_user')
+            WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = :'iam_db')\gexec
+            SQL
+
+            echo "⬇️ Pull latest IAM image"
+            docker pull zmtechlabs/zm-iam-service:latest
+
+            echo "🛑 Stop IAM (test)"
+            docker stop ivy-iam || true
+
+            echo "🗑 Remove old container (test)"
+            docker rm ivy-iam || true
+
+            echo "🚀 Start IAM (test)"
+            docker run -d \
+              --name ivy-iam \
+              --network ivy-net \
+              --env-file /opt/ivy-events/env/iam.env \
+              -p 8383:8383 \
+              -e SPRING_PROFILES_ACTIVE=test \
+              zmtechlabs/zm-iam-service:latest
+
+            echo "✅ IAM (test) deployed successfully"
