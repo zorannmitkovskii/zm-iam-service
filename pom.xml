@@ -100,6 +100,15 @@
             <version>26.0.7</version>
         </dependency>
 
+        <!-- YAML support for provisioning manifests. Spring Boot bundles
+             SnakeYAML for its own config; this brings the Jackson bridge
+             so ManifestObjectMapper can read manifest YAML with the same
+             strict rules as manifest JSON. -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-yaml</artifactId>
+        </dependency>
+
         <!-- ── Test ─────────────────────────────────────── -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
