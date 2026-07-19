@@ -1,5 +1,6 @@
 package org.ivyinc.iam.provisioning.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
@@ -46,6 +47,11 @@ public record ServiceProvisioningManifest(
      *  may only declare their own {@code {serviceId}-svc} client in it. */
     public static final String ZM_SERVICES_REALM = "zm-services";
 
+    /** {@link JsonIgnore} so Jackson doesn't emit these boolean assertion
+     *  methods as extra fields when we canonicalise the manifest for
+     *  persistence — the round-trip would then fail with an
+     *  UnrecognizedPropertyException on read. */
+    @JsonIgnore
     @AssertTrue(message = "realm names must be unique across the manifest")
     public boolean isRealmNamesUnique() {
         if (realms == null) return true;
@@ -60,6 +66,7 @@ public record ServiceProvisioningManifest(
                 .count();
     }
 
+    @JsonIgnore
     @AssertTrue(message = "in zm-services realm only clients with clientId == '{serviceId}-svc' are allowed")
     public boolean isZmServicesScopeRespected() {
         if (realms == null || serviceId == null) return true;
