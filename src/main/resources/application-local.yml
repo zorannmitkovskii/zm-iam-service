@@ -21,4 +21,4 @@ iam:
 logging:
   level:
     org.springframework: INFO
-    org.ivyinc.iam: DEBUG
+    zm.iam: DEBUG
