@@ -12,7 +12,7 @@
         <relativePath/>
     </parent>
 
-    <groupId>org.ivyinc</groupId>
+    <groupId>zm</groupId>
     <artifactId>zm-iam-service</artifactId>
     <version>0.1.0-SNAPSHOT</version>
     <name>zm-iam-service</name>

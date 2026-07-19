@@ -13,4 +13,4 @@ server:
 logging:
   level:
     root: WARN
-    org.ivyinc.iam: INFO
+    zm.iam: INFO
