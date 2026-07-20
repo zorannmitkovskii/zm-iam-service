@@ -100,6 +100,24 @@
             <version>26.0.7</version>
         </dependency>
 
+        <!-- Spring Security — filter chain for /provisioning/** (IAM-05). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <!-- Argon2PasswordEncoder needs BouncyCastle at runtime. -->
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk18on</artifactId>
+            <version>1.78.1</version>
+        </dependency>
+
+        <!-- Caffeine — sliding-window rate limiter cache. -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+
         <!-- YAML support for provisioning manifests. Spring Boot bundles
              SnakeYAML for its own config; this brings the Jackson bridge
              so ManifestObjectMapper can read manifest YAML with the same
