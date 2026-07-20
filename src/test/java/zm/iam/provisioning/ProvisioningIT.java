@@ -44,7 +44,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @Testcontainers
 @SpringBootTest
-class ProvisioningIT {
+public class ProvisioningIT {
 
     private static final String ADMIN_SERVICE_CLIENT_ID = "admin-service";
     private static final String ADMIN_SERVICE_SECRET    = "it-secret";
@@ -79,7 +79,7 @@ class ProvisioningIT {
     /** Public static so PartialFailIT + ConcurrencyIT can seed their own
      *  KeycloakContainer. Each @SpringBootTest class has an isolated
      *  container instance. */
-    static void seedAdminServiceClient(KeycloakContainer kc) {
+    public static void seedAdminServiceClient(KeycloakContainer kc) {
         try (Keycloak master = KeycloakBuilder.builder()
                 .serverUrl(kc.getAuthServerUrl())
                 .realm("master")

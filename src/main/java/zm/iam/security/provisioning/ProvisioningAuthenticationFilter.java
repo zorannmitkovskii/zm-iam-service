@@ -115,9 +115,15 @@ public class ProvisioningAuthenticationFilter extends OncePerRequestFilter {
             wrapped.getInputStream().readAllBytes();
         }
 
-        Optional<String> requestedServiceId =
-                serviceIdExtractor.extract(wrapped, wrapped.getContentAsByteArray());
-        if (requestedServiceId.isEmpty()) {
+        // /provisioning/ownership is an operator-facing debug endpoint —
+        // any valid token authenticates, no serviceId scoping. It's
+        // safer to require SOME auth than to leave it wide open.
+        boolean skipServiceIdCheck = path.startsWith("/provisioning/ownership");
+
+        Optional<String> requestedServiceId = skipServiceIdCheck
+                ? Optional.empty()
+                : serviceIdExtractor.extract(wrapped, wrapped.getContentAsByteArray());
+        if (!skipServiceIdCheck && requestedServiceId.isEmpty()) {
             rateLimiter.recordFailure(clientIp);
             audit.audit(AuthAuditLogger.Decision.DENIED_SERVICEID_MISMATCH,
                     null, null, clientIp, path, tokenLen);
@@ -126,7 +132,7 @@ public class ProvisioningAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        String targetService = requestedServiceId.get();
+        String targetService = requestedServiceId.orElse(null);
         String matchedService = verifyAgainstAnyKnownService(token);
 
         if (matchedService == null) {
@@ -137,7 +143,7 @@ public class ProvisioningAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        if (!matchedService.equals(targetService)) {
+        if (!skipServiceIdCheck && !matchedService.equals(targetService)) {
             // Do NOT count as failure — the token IS valid, just for a
             // different service. Counting would let a legit service be
             // rate-limited by an attacker who knows its token but targets

@@ -11,6 +11,7 @@ import zm.iam.provisioning.dto.ProtocolMapperDeclaration;
 import zm.iam.provisioning.dto.RealmDeclaration;
 import zm.iam.provisioning.dto.ServiceProvisioningManifest;
 import zm.iam.provisioning.hashing.ManifestHasher;
+import zm.iam.provisioning.ownership.OwnershipService;
 import zm.iam.provisioning.persistence.AppliedManifest;
 import zm.iam.provisioning.persistence.AppliedManifestRepository;
 import zm.iam.provisioning.reconcile.ChangeEntry;
@@ -52,6 +53,7 @@ public class ProvisioningService {
     private final ManifestHasher hasher;
     private final ObjectMapper canonicalMapper;
     private final KeycloakAdminApi keycloak;
+    private final OwnershipService ownership;
     private final RealmReconciler realmReconciler;
     private final ClientReconciler clientReconciler;
     private final ProtocolMapperReconciler mapperReconciler;
@@ -65,6 +67,7 @@ public class ProvisioningService {
                                ManifestHasher hasher,
                                @Qualifier("manifestCanonicalMapper") ObjectMapper canonicalMapper,
                                KeycloakAdminApi keycloak,
+                               OwnershipService ownership,
                                RealmReconciler realmReconciler,
                                ClientReconciler clientReconciler,
                                ProtocolMapperReconciler mapperReconciler,
@@ -74,6 +77,7 @@ public class ProvisioningService {
         this.hasher = hasher;
         this.canonicalMapper = canonicalMapper;
         this.keycloak = keycloak;
+        this.ownership = ownership;
         this.realmReconciler = realmReconciler;
         this.clientReconciler = clientReconciler;
         this.mapperReconciler = mapperReconciler;
@@ -98,6 +102,11 @@ public class ProvisioningService {
                     manifest.serviceId(), manifest.manifestVersion(), prev.getVersion());
             return new ApplyResult(ApplyResult.Status.NOOP, manifest.serviceId(), prev.getVersion(), List.of());
         }
+
+        // ── Ownership pre-check (IAM-06) ───────────────────────────
+        // Read-only. Throws OwnershipConflictException BEFORE any
+        // Keycloak write, so a conflict leaves Keycloak untouched.
+        ownership.check(manifest.serviceId(), manifest);
 
         // Deserialise previous manifest once — mapper reconciler needs it
         // for the "only delete what we planted" decision.
@@ -134,6 +143,10 @@ public class ProvisioningService {
             throw new ProvisioningFailedException(
                     "Provisioning failed: " + e.getMessage(), appliedSteps, e);
         }
+
+        // ── Register ownership rows (IAM-06) ───────────────────────
+        // Idempotent — resources we already own are no-ops.
+        ownership.register(manifest.serviceId(), manifest);
 
         // ── Persist AppliedManifest — commit == permanence ─────────
         AppliedManifest record = AppliedManifest.builder()

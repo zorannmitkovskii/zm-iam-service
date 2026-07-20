@@ -3,11 +3,14 @@ package zm.iam.keycloak.bootstrap;
 import lombok.extern.slf4j.Slf4j;
 import zm.iam.keycloak.KeycloakAdminApi;
 import zm.iam.keycloak.config.KeycloakProperties;
+import zm.iam.provisioning.ownership.OwnershipService;
+import zm.iam.provisioning.ownership.ResourceType;
 import org.keycloak.representations.idm.RealmRepresentation;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The ONLY hardcoded Keycloak bootstrap in IAM: guarantees the
@@ -40,13 +43,18 @@ public class ServiceRealmProvisioner {
 
     private final KeycloakProperties props;
     private final KeycloakAdminApi keycloak;
+    private final OwnershipService ownership;
 
-    public ServiceRealmProvisioner(KeycloakProperties props, KeycloakAdminApi keycloak) {
+    public ServiceRealmProvisioner(KeycloakProperties props,
+                                   KeycloakAdminApi keycloak,
+                                   OwnershipService ownership) {
         this.props = props;
         this.keycloak = keycloak;
+        this.ownership = ownership;
     }
 
     @EventListener(ApplicationReadyEvent.class)
+    @Transactional
     public void provision() {
         String realmName = props.getZmServicesRealm();
         String roleName = props.getIamClientRole();
@@ -55,6 +63,10 @@ public class ServiceRealmProvisioner {
 
         ensureRealm(realmName);
         ensureRealmRole(realmName, roleName);
+        // Plant IAM as the owner of the shared zm-services realm so no
+        // provisioning caller can later claim it. Idempotent — safe on
+        // every startup.
+        ownership.registerBootstrap(realmName, realmName, ResourceType.REALM);
 
         log.info("[ServiceRealmProvisioner] Provisioning complete");
     }
