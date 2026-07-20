@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import zm.iam.common.ApiResponse;
 import zm.iam.provisioning.dto.ServiceProvisioningManifest;
+import zm.iam.provisioning.ownership.OwnershipConflictException;
 import zm.iam.provisioning.persistence.AppliedManifestRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -78,5 +79,16 @@ public class ProvisioningController {
         );
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error("Provisioning failed", body));
+    }
+
+    /** IAM-06 — ownership conflict → 409 with every rejected resource
+     *  and its current owner. Because ownership check runs BEFORE any
+     *  Keycloak write, the 409 leaves Keycloak completely untouched. */
+    @ExceptionHandler(OwnershipConflictException.class)
+    public ResponseEntity<ApiResponse<Map<String, Object>>> handleOwnershipConflict(
+            OwnershipConflictException ex) {
+        Map<String, Object> body = Map.of("conflicts", ex.getConflicts());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error("Ownership conflict", body));
     }
 }
