@@ -41,6 +41,12 @@ public class SecurityConfig {
                         // check a manifest before shipping it.
                         .requestMatchers("/provisioning/manifests/validate").permitAll()
                         .requestMatchers("/provisioning/**").hasRole("PROVISIONING")
+                        // TODO IAM-09: lock /internal/** behind JWT auth.
+                        // For now (IAM-08 only), this is permitAll so
+                        // integration tests + ivy-events-be dev can hit
+                        // user-management endpoints. NEVER ship this to
+                        // prod without IAM-09 in place.
+                        .requestMatchers("/internal/**").permitAll()
                         // Locked by default — every new endpoint must be
                         // explicitly opened above.
                         .anyRequest().denyAll())

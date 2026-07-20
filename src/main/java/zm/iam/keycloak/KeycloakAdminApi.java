@@ -1,17 +1,22 @@
 package zm.iam.keycloak;
 
 import jakarta.ws.rs.NotFoundException;
+import jakarta.ws.rs.core.Response;
 import lombok.extern.slf4j.Slf4j;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.resource.ClientResource;
 import org.keycloak.admin.client.resource.RealmResource;
+import org.keycloak.admin.client.resource.UserResource;
 import org.keycloak.representations.idm.ClientRepresentation;
+import org.keycloak.representations.idm.CredentialRepresentation;
 import org.keycloak.representations.idm.IdentityProviderRepresentation;
 import org.keycloak.representations.idm.ProtocolMapperRepresentation;
 import org.keycloak.representations.idm.RealmRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
+import org.keycloak.representations.idm.UserRepresentation;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -191,5 +196,127 @@ public class KeycloakAdminApi {
             admin.realm(realmName).roles().create(role);
             log.info("[KeycloakAdminApi] Created realm role '{}' in realm '{}'", roleName, realmName);
         }
+    }
+
+    /** Look up multiple realm roles by name in one shot — the PUT roles
+     *  endpoint needs {@link RoleRepresentation} objects for
+     *  {@code roles().realmLevel().add/remove}. */
+    public List<RoleRepresentation> findRealmRoleReps(String realmName, List<String> roleNames) {
+        try (Keycloak admin = session.client()) {
+            RealmResource realm = admin.realm(realmName);
+            List<RoleRepresentation> out = new ArrayList<>(roleNames.size());
+            for (String name : roleNames) {
+                try {
+                    out.add(realm.roles().get(name).toRepresentation());
+                } catch (NotFoundException e) {
+                    throw new NotFoundException("Realm role '" + name + "' not found in realm '" + realmName + "'");
+                }
+            }
+            return out;
+        }
+    }
+
+    // ── Users ───────────────────────────────────────────────────────
+
+    /** Exact-email search. Keycloak's {@code search(email, ...)} matches
+     *  substring; the {@code searchByEmail} variant (exact=true) is what
+     *  the UserService needs to make "duplicate email" checks reliable. */
+    public List<UserRepresentation> findUsersByEmail(String realmName, String email) {
+        try (Keycloak admin = session.client()) {
+            return admin.realm(realmName).users().searchByEmail(email, true);
+        }
+    }
+
+    public Optional<UserRepresentation> findUser(String realmName, String userId) {
+        try (Keycloak admin = session.client()) {
+            return Optional.of(admin.realm(realmName).users().get(userId).toRepresentation());
+        } catch (NotFoundException e) {
+            return Optional.empty();
+        }
+    }
+
+    /** @return the newly-created user's UUID. Throws with the raw HTTP
+     *  status so the caller can distinguish 409 (duplicate email) from
+     *  500. */
+    public String createUser(String realmName, UserRepresentation user) {
+        try (Keycloak admin = session.client()) {
+            try (Response resp = admin.realm(realmName).users().create(user)) {
+                int status = resp.getStatus();
+                if (status == 201) {
+                    // Keycloak returns the new id via the Location header.
+                    String location = resp.getHeaderString("Location");
+                    if (location == null) {
+                        throw new IllegalStateException("Keycloak returned 201 without Location header");
+                    }
+                    String id = location.substring(location.lastIndexOf('/') + 1);
+                    log.info("[KeycloakAdminApi] Created user id={} email='{}' in realm '{}'",
+                            id, user.getEmail(), realmName);
+                    return id;
+                }
+                throw new KeycloakApiException(
+                        "User create failed: HTTP " + status + " body="
+                                + (resp.hasEntity() ? resp.readEntity(String.class) : "<empty>"),
+                        status);
+            }
+        }
+    }
+
+    public void updateUser(String realmName, String userId, UserRepresentation user) {
+        try (Keycloak admin = session.client()) {
+            admin.realm(realmName).users().get(userId).update(user);
+            log.debug("[KeycloakAdminApi] Updated user id={} in realm '{}'", userId, realmName);
+        }
+    }
+
+    public void deleteUser(String realmName, String userId) {
+        try (Keycloak admin = session.client()) {
+            admin.realm(realmName).users().get(userId).remove();
+            log.info("[KeycloakAdminApi] Deleted user id={} in realm '{}'", userId, realmName);
+        }
+    }
+
+    public List<RoleRepresentation> getUserRealmRoles(String realmName, String userId) {
+        try (Keycloak admin = session.client()) {
+            return admin.realm(realmName).users().get(userId).roles().realmLevel().listAll();
+        }
+    }
+
+    public void addUserRealmRoles(String realmName, String userId, List<RoleRepresentation> roles) {
+        if (roles.isEmpty()) return;
+        try (Keycloak admin = session.client()) {
+            admin.realm(realmName).users().get(userId).roles().realmLevel().add(roles);
+        }
+    }
+
+    public void removeUserRealmRoles(String realmName, String userId, List<RoleRepresentation> roles) {
+        if (roles.isEmpty()) return;
+        try (Keycloak admin = session.client()) {
+            admin.realm(realmName).users().get(userId).roles().realmLevel().remove(roles);
+        }
+    }
+
+    /** Set a password on a user. {@code temporary=true} forces
+     *  {@code UPDATE_PASSWORD} required action on next login — matches
+     *  the admin-created flow. */
+    public void resetPassword(String realmName, String userId, String password, boolean temporary) {
+        CredentialRepresentation cred = new CredentialRepresentation();
+        cred.setType(CredentialRepresentation.PASSWORD);
+        cred.setValue(password);
+        cred.setTemporary(temporary);
+        try (Keycloak admin = session.client()) {
+            UserResource userRes = admin.realm(realmName).users().get(userId);
+            userRes.resetPassword(cred);
+        }
+    }
+
+    /** Thrown when the Admin REST call comes back with a non-2xx we care
+     *  about propagating specifically (mostly 409 on user create). */
+    public static class KeycloakApiException extends RuntimeException {
+        private final int status;
+        public KeycloakApiException(String message, int status) {
+            super(message);
+            this.status = status;
+        }
+        public int status() { return status; }
     }
 }
