@@ -20,6 +20,9 @@ import zm.iam.provisioning.reconcile.IdpReconciler;
 import zm.iam.provisioning.reconcile.ProtocolMapperReconciler;
 import zm.iam.provisioning.reconcile.RealmReconciler;
 import zm.iam.provisioning.reconcile.RoleReconciler;
+import zm.iam.audit.AuditEvent;
+import zm.iam.audit.AuditService;
+import zm.iam.audit.TargetType;
 import zm.iam.security.internal.OwnedRealmsCache;
 import org.keycloak.representations.idm.ClientRepresentation;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,6 +64,7 @@ public class ProvisioningService {
     private final ProtocolMapperReconciler mapperReconciler;
     private final RoleReconciler roleReconciler;
     private final IdpReconciler idpReconciler;
+    private final AuditService audit;
 
     /** Optional so tests that don't wire the security package (e.g.
      *  pure reconciler slice tests) still compile. Runtime always has
@@ -80,7 +84,8 @@ public class ProvisioningService {
                                ClientReconciler clientReconciler,
                                ProtocolMapperReconciler mapperReconciler,
                                RoleReconciler roleReconciler,
-                               IdpReconciler idpReconciler) {
+                               IdpReconciler idpReconciler,
+                               AuditService audit) {
         this.repository = repository;
         this.hasher = hasher;
         this.canonicalMapper = canonicalMapper;
@@ -91,6 +96,7 @@ public class ProvisioningService {
         this.mapperReconciler = mapperReconciler;
         this.roleReconciler = roleReconciler;
         this.idpReconciler = idpReconciler;
+        this.audit = audit;
     }
 
     @Transactional
@@ -108,6 +114,14 @@ public class ProvisioningService {
             }
             log.info("[Provisioning] NOOP for serviceId='{}' — incoming version {} <= applied {}",
                     manifest.serviceId(), manifest.manifestVersion(), prev.getVersion());
+            audit.record(AuditEvent.builder()
+                    .caller(manifest.serviceId())
+                    .targetType(TargetType.MANIFEST)
+                    .targetId(manifest.serviceId() + ":v" + manifest.manifestVersion())
+                    .operation("NOOP")
+                    .detail(java.util.Map.of("appliedVersion", prev.getVersion()))
+                    .success(true)
+                    .build());
             return new ApplyResult(ApplyResult.Status.NOOP, manifest.serviceId(), prev.getVersion(), List.of());
         }
 
@@ -180,6 +194,20 @@ public class ProvisioningService {
 
         log.info("[Provisioning] APPLIED serviceId='{}' version={} with {} changes",
                 manifest.serviceId(), manifest.manifestVersion(), appliedSteps.size());
+
+        // ── IAM-11 audit — one row per apply, count-only detail so
+        //    values like redirect URIs never land in the audit table.
+        audit.record(AuditEvent.builder()
+                .caller(manifest.serviceId())
+                .targetType(TargetType.MANIFEST)
+                .targetId(manifest.serviceId() + ":v" + manifest.manifestVersion())
+                .operation("APPLY")
+                .detail(java.util.Map.of(
+                        "manifestHash", record.getManifestHash(),
+                        "changeCount", appliedSteps.size()))
+                .success(true)
+                .build());
+
         return new ApplyResult(ApplyResult.Status.APPLIED, manifest.serviceId(),
                 manifest.manifestVersion(), appliedSteps);
     }
