@@ -105,6 +105,13 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
+        <!-- OAuth2 resource server — JWT validation for /internal/** (IAM-09).
+             Issuer is the zm-services realm on our Keycloak; every /internal
+             caller is a service account holding a client_credentials token. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
         <!-- Argon2PasswordEncoder needs BouncyCastle at runtime. -->
         <dependency>
             <groupId>org.bouncycastle</groupId>

@@ -20,7 +20,9 @@ import zm.iam.provisioning.reconcile.IdpReconciler;
 import zm.iam.provisioning.reconcile.ProtocolMapperReconciler;
 import zm.iam.provisioning.reconcile.RealmReconciler;
 import zm.iam.provisioning.reconcile.RoleReconciler;
+import zm.iam.security.internal.OwnedRealmsCache;
 import org.keycloak.representations.idm.ClientRepresentation;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -59,6 +61,12 @@ public class ProvisioningService {
     private final ProtocolMapperReconciler mapperReconciler;
     private final RoleReconciler roleReconciler;
     private final IdpReconciler idpReconciler;
+
+    /** Optional so tests that don't wire the security package (e.g.
+     *  pure reconciler slice tests) still compile. Runtime always has
+     *  one — the bean is unconditionally registered by SecurityConfig. */
+    @Autowired(required = false)
+    private OwnedRealmsCache ownedRealmsCache;
 
     @PersistenceContext
     private EntityManager em;
@@ -158,6 +166,17 @@ public class ProvisioningService {
                 .appliedAt(OffsetDateTime.now())
                 .build();
         repository.save(record);
+
+        // ── IAM-09 cache invalidation ──────────────────────────────
+        // Ownership rows just changed (new realms owned, or a first-
+        // time owner planted). The realm-scope authz filter caches
+        // the "serviceId → owned realms" mapping in memory, so evict
+        // the entry for this service to force a re-read on the next
+        // /internal/** call. Guarded — the cache bean may be null in
+        // slice tests that don't load the security package.
+        if (ownedRealmsCache != null) {
+            ownedRealmsCache.invalidate(manifest.serviceId());
+        }
 
         log.info("[Provisioning] APPLIED serviceId='{}' version={} with {} changes",
                 manifest.serviceId(), manifest.manifestVersion(), appliedSteps.size());

@@ -73,3 +73,12 @@ iam:
     self-bootstrap-enabled: ${IAM_SELF_BOOTSTRAP_ENABLED:true}
     zm-services-realm: ${IAM_ZM_SERVICES_REALM:zm-services}
     iam-client-role: ${IAM_IAM_CLIENT_ROLE:iam-client}
+  # IAM-09 resource-server config. The issuer URI defaults to the
+  # zm-services realm on the Keycloak configured above; override only
+  # when the Keycloak host published to /internal callers differs from
+  # the host IAM uses for admin API calls (rare — usually only in test
+  # container environments where the issuer inside the token is
+  # container-local while the JWKS discovery URL is host-mapped).
+  security:
+    internal:
+      issuer-uri: ${IAM_INTERNAL_ISSUER_URI:}
