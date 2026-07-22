@@ -1,6 +1,7 @@
 package zm.iam;
 
 import zm.iam.keycloak.config.KeycloakProperties;
+import zm.iam.publicauth.PublicAuthProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
@@ -13,7 +14,9 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
  * in the monorepo root for the full spec.
  */
 @SpringBootApplication
-@ConfigurationPropertiesScan(basePackageClasses = KeycloakProperties.class)
+// Scan both packages that hold @ConfigurationProperties: keycloak.config
+// (KeycloakProperties) and publicauth (PublicAuthProperties).
+@ConfigurationPropertiesScan(basePackageClasses = {KeycloakProperties.class, PublicAuthProperties.class})
 public class IvyIamApplication {
 
     public static void main(String[] args) {

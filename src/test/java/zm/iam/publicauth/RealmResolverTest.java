@@ -14,7 +14,7 @@ class RealmResolverTest {
 
     @BeforeEach
     void setUp() {
-        var props = new RealmResolver.PublicAuthProperties();
+        var props = new PublicAuthProperties();
         props.setOriginToRealm(Map.of(
                 "ivyevents.mk", "event-app",
                 "test.ivyevents.mk", "event-app",

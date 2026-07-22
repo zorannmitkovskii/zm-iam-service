@@ -1,13 +1,8 @@
 package zm.iam.publicauth;
 
-import lombok.Getter;
-import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -60,15 +55,5 @@ public class RealmResolver {
         int colon = noScheme.indexOf(':');
         if (colon > 0) noScheme = noScheme.substring(0, colon);
         return noScheme.toLowerCase();
-    }
-
-    @Getter
-    @Setter
-    @ConfigurationProperties(prefix = "iam.public-auth")
-    public static class PublicAuthProperties {
-        /** Origin host → realm. */
-        private Map<String, String> originToRealm = new HashMap<>();
-        /** Explicit appId (from body) → realm. */
-        private Map<String, String> appIdToRealm = new HashMap<>();
     }
 }
