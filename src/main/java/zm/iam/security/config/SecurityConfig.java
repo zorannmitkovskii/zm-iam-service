@@ -103,12 +103,33 @@ public class SecurityConfig {
         return http.build();
     }
 
+    // ── IAM-10 public auth chain ───────────────────────────────────
+    // No JWT, no bootstrap token — these are the flows a browser hits
+    // BEFORE it has any credentials. Every endpoint here is throttled
+    // (rate limiter) and validated (verification codes, Origin→realm
+    // mapping) at the service layer.
+    @Bean
+    @Order(3)
+    public SecurityFilterChain publicAuthFilterChain(HttpSecurity http) throws Exception {
+        http
+                .securityMatcher("/public/**")
+                .csrf(AbstractHttpConfigurer::disable)
+                // CORS matters here — browsers hit this chain directly.
+                // Global CORS config would work; we leave it disabled at
+                // the security layer and rely on the nginx CORS response
+                // in front (matching current ivy-events-be topology).
+                .cors(AbstractHttpConfigurer::disable)
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+        return http.build();
+    }
+
     // ── Default deny-all catch-all ─────────────────────────────────
-    // Any request that matched neither of the two chains above lands
+    // Any request that matched none of the three chains above lands
     // here and is refused. This is our safety net against future
     // controllers being added without a matching security rule.
     @Bean
-    @Order(3)
+    @Order(4)
     public SecurityFilterChain denyAllFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)

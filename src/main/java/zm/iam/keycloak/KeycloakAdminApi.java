@@ -1,15 +1,18 @@
 package zm.iam.keycloak;
 
 import jakarta.ws.rs.NotFoundException;
+import jakarta.ws.rs.core.Response;
 import lombok.extern.slf4j.Slf4j;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.resource.ClientResource;
 import org.keycloak.admin.client.resource.RealmResource;
 import org.keycloak.representations.idm.ClientRepresentation;
+import org.keycloak.representations.idm.CredentialRepresentation;
 import org.keycloak.representations.idm.IdentityProviderRepresentation;
 import org.keycloak.representations.idm.ProtocolMapperRepresentation;
 import org.keycloak.representations.idm.RealmRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
+import org.keycloak.representations.idm.UserRepresentation;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -190,6 +193,85 @@ public class KeycloakAdminApi {
         try (Keycloak admin = session.client()) {
             admin.realm(realmName).roles().create(role);
             log.info("[KeycloakAdminApi] Created realm role '{}' in realm '{}'", roleName, realmName);
+        }
+    }
+
+    // ── IAM-10 user operations ──────────────────────────────────────
+
+    /** Exact-email search inside a realm. Returns empty when not found. */
+    public Optional<UserRepresentation> findUserByEmail(String realmName, String email) {
+        try (Keycloak admin = session.client()) {
+            List<UserRepresentation> hits = admin.realm(realmName).users().searchByEmail(email, true);
+            return hits.isEmpty() ? Optional.empty() : Optional.of(hits.get(0));
+        }
+    }
+
+    /** Create a disabled user (public register flow enables it after
+     *  email verification). Returns the Keycloak UUID. */
+    public String createUser(String realmName, String email, String firstName, String lastName,
+                              boolean enabled) {
+        UserRepresentation user = new UserRepresentation();
+        user.setEmail(email);
+        user.setUsername(email);
+        user.setFirstName(firstName);
+        user.setLastName(lastName);
+        user.setEnabled(enabled);
+        user.setEmailVerified(false);
+        try (Keycloak admin = session.client();
+             Response resp = admin.realm(realmName).users().create(user)) {
+            if (resp.getStatus() == 201) {
+                String location = resp.getHeaderString("Location");
+                String id = location.substring(location.lastIndexOf('/') + 1);
+                log.info("[KeycloakAdminApi] Created user id={} email='{}' in realm '{}' (enabled={})",
+                        id, email, realmName, enabled);
+                return id;
+            }
+            throw new KeycloakApiException(
+                    "User create failed: HTTP " + resp.getStatus() + " body="
+                            + (resp.hasEntity() ? resp.readEntity(String.class) : "<empty>"),
+                    resp.getStatus());
+        }
+    }
+
+    /** Toggle user enable/disable — post-verification flip and
+     *  admin-side user management alike use this. */
+    public void setUserEnabled(String realmName, String userId, boolean enabled) {
+        try (Keycloak admin = session.client()) {
+            UserRepresentation user = admin.realm(realmName).users().get(userId).toRepresentation();
+            user.setEnabled(enabled);
+            if (enabled) user.setEmailVerified(true);
+            admin.realm(realmName).users().get(userId).update(user);
+            log.info("[KeycloakAdminApi] User id={} enabled={} in realm '{}'", userId, enabled, realmName);
+        }
+    }
+
+    /** Reset a user's password. {@code temporary=false} for public
+     *  self-serve flows (register verification, password reset);
+     *  {@code true} for admin-provisioned accounts that must change on
+     *  first login. */
+    public void resetUserPassword(String realmName, String userId, String newPassword, boolean temporary) {
+        CredentialRepresentation cred = new CredentialRepresentation();
+        cred.setType(CredentialRepresentation.PASSWORD);
+        cred.setValue(newPassword);
+        cred.setTemporary(temporary);
+        try (Keycloak admin = session.client()) {
+            admin.realm(realmName).users().get(userId).resetPassword(cred);
+            log.info("[KeycloakAdminApi] Reset password for user id={} realm='{}' (temporary={})",
+                    userId, realmName, temporary);
+        }
+    }
+
+    /** Assign realm-level roles to a user by role name. */
+    public void addUserRealmRoles(String realmName, String userId, List<String> roleNames) {
+        if (roleNames == null || roleNames.isEmpty()) return;
+        try (Keycloak admin = session.client()) {
+            RealmResource realm = admin.realm(realmName);
+            List<RoleRepresentation> roles = roleNames.stream()
+                    .map(name -> realm.roles().get(name).toRepresentation())
+                    .toList();
+            realm.users().get(userId).roles().realmLevel().add(roles);
+            log.info("[KeycloakAdminApi] Assigned roles {} to user id={} realm='{}'",
+                    roleNames, userId, realmName);
         }
     }
 }
