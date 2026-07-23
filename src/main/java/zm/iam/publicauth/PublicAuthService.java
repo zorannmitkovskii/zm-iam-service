@@ -117,13 +117,13 @@ public class PublicAuthService {
     public TokenResponseDto login(String realm, LoginRequest req) {
         try {
             KeycloakTokenClient.TokenResponse resp =
-                    tokens.passwordGrant(realm, req.email(), req.password());
-            audit.record(auditEvt(req.email(), realm, "LOGIN", true, Map.of()));
+                    tokens.passwordGrant(realm, req.username(), req.password());
+            audit.record(auditEvt(req.username(), realm, "LOGIN", true, Map.of()));
             return new TokenResponseDto(
                     resp.accessToken(), resp.refreshToken(), resp.idToken(),
                     resp.expiresIn(), resp.tokenType());
         } catch (KeycloakTokenClient.PasswordGrantException e) {
-            audit.record(auditEvt(req.email(), realm, "LOGIN", false,
+            audit.record(auditEvt(req.username(), realm, "LOGIN", false,
                     Map.of("keycloakStatus", e.getStatus())));
             throw new BusinessException(ErrorCode.AUTHN_FAILED, "Invalid credentials");
         }
