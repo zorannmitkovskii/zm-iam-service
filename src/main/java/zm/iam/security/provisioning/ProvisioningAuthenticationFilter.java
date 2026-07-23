@@ -1,8 +1,11 @@
 package zm.iam.security.provisioning;
 
 import jakarta.servlet.FilterChain;
+import jakarta.servlet.ReadListener;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletInputStream;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,7 +18,11 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.util.ContentCachingRequestWrapper;
 
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 
@@ -82,9 +89,25 @@ public class ProvisioningAuthenticationFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         if (!enabled) {
-            // Escape hatch for tests / early staging that don't want the
-            // filter engaged. Prod MUST leave this at default (true).
-            chain.doFilter(request, response);
+            // Local/test escape hatch: skip token verification, but STILL
+            // authenticate as the requested service so SecurityConfig's
+            // hasRole("PROVISIONING") rule passes. The token check and the
+            // authz rule are SEPARATE gates — without setting the
+            // authentication here the request falls through to a 403.
+            // We buffer the body once and hand the controller a re-readable
+            // copy: ContentCachingRequestWrapper caches for
+            // getContentAsByteArray() but does NOT replay getInputStream()
+            // downstream, so the @RequestBody would otherwise read empty.
+            // Prod MUST leave this at default (true).
+            byte[] body = request.getInputStream().readAllBytes();
+            String serviceId = serviceIdExtractor.extract(request, body).orElse("local");
+            SecurityContextHolder.getContext().setAuthentication(
+                    new ProvisioningTokenAuthentication(serviceId));
+            try {
+                chain.doFilter(new CachedBodyHttpServletRequest(request, body), response);
+            } finally {
+                SecurityContextHolder.clearContext();
+            }
             return;
         }
 
@@ -206,5 +229,34 @@ public class ProvisioningAuthenticationFilter extends OncePerRequestFilter {
     @SuppressWarnings("unused")
     private List<String> hashesFor(String serviceId) {
         return tokenRegistry.hashesFor(serviceId);
+    }
+
+    /** Serves a pre-read body so a downstream {@code @RequestBody} can
+     *  deserialise it after the filter already consumed the original stream.
+     *  Only used on the disabled-security (local) path. */
+    private static final class CachedBodyHttpServletRequest extends HttpServletRequestWrapper {
+
+        private final byte[] body;
+
+        CachedBodyHttpServletRequest(HttpServletRequest request, byte[] body) {
+            super(request);
+            this.body = body;
+        }
+
+        @Override
+        public ServletInputStream getInputStream() {
+            ByteArrayInputStream buffer = new ByteArrayInputStream(body);
+            return new ServletInputStream() {
+                @Override public int read() { return buffer.read(); }
+                @Override public boolean isFinished() { return buffer.available() == 0; }
+                @Override public boolean isReady() { return true; }
+                @Override public void setReadListener(ReadListener readListener) { }
+            };
+        }
+
+        @Override
+        public BufferedReader getReader() {
+            return new BufferedReader(new InputStreamReader(getInputStream(), StandardCharsets.UTF_8));
+        }
     }
 }
