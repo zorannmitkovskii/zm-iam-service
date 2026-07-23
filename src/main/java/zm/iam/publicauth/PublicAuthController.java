@@ -72,23 +72,27 @@ public class PublicAuthController {
     // ── /auth/verify-email ───────────────────────────────────────
 
     @PostMapping("/auth/verify-email")
-    public ResponseEntity<ApiResponse<TokenResponseDto>> verifyEmail(
+    public ResponseEntity<TokenResponseDto> verifyEmail(
             @Valid @RequestBody VerifyEmailRequest req,
             @RequestHeader(value = "Origin", required = false) String origin) {
         String realm = requireRealm(origin, req.appId());
         TokenResponseDto tokens = service.verifyEmail(realm, req);
-        return ResponseEntity.ok(ApiResponse.ok(tokens));
+        // Tokens returned at top level (NOT wrapped in ApiResponse) to match the
+        // FE contract (auth.service.js reads data.accessToken directly).
+        return ResponseEntity.ok(tokens);
     }
 
     // ── /users/login ─────────────────────────────────────────────
 
     @PostMapping("/users/login")
-    public ResponseEntity<ApiResponse<TokenResponseDto>> login(
+    public ResponseEntity<TokenResponseDto> login(
             @Valid @RequestBody LoginRequest req,
             @RequestHeader(value = "Origin", required = false) String origin) {
         String realm = requireRealm(origin, req.appId());
         TokenResponseDto tokens = service.login(realm, req);
-        return ResponseEntity.ok(ApiResponse.ok(tokens));
+        // Tokens returned at top level (NOT wrapped in ApiResponse) to match the
+        // FE contract (auth.service.js reads data.accessToken directly).
+        return ResponseEntity.ok(tokens);
     }
 
     // ── /password-reset ──────────────────────────────────────────
