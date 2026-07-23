@@ -95,3 +95,9 @@ iam:
       from-address: ${ZEPTO_FROM_ADDRESS:noreply@ivyevents.mk}
       from-name: ${ZEPTO_FROM_NAME:Ivy Events}
       base-url: ${ZEPTO_BASE_URL:https://api.zeptomail.eu}
+
+  # ── Public-auth: realm → public Keycloak client for the ROPC (password)
+  #    grant. The client MUST have "Direct Access Grants" enabled in Keycloak.
+  public-auth:
+    realm-client-ids:
+      event-app: ${IAM_EVENT_APP_CLIENT_ID:eventFE}
