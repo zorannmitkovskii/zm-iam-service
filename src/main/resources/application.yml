@@ -82,3 +82,16 @@ iam:
   security:
     internal:
       issuer-uri: ${IAM_INTERNAL_ISSUER_URI:}
+
+  # ── Outbound email (ZeptoMail HTTP API) ──────────────────────────────
+  # Real transactional email for public-auth verification / password-reset
+  # codes. Defaults baked in so IAM sends out of the box — no env needed.
+  # Override via env only if the ZeptoMail account/sender changes; set
+  # enabled=false (see application-local.yml) to log the code in local dev.
+  email:
+    zepto:
+      enabled: ${IAM_ZEPTO_ENABLED:true}
+      token: ${ZEPTO_TOKEN:Zoho-enczapikey yA6KbHsLuguiy2IGSBFsh5eJpYk3/qo8iSqwtC7gKMwnLtLli6E50EI+K4HoITaMj4WEs61RbNkRcYCx69wNepVnYYJZLJTGTuv4P2uV48xh8ciEYNYvgZWpC7MQE6VMeB8hDC05T/YnWA==}
+      from-address: ${ZEPTO_FROM_ADDRESS:noreply@ivyevents.mk}
+      from-name: ${ZEPTO_FROM_NAME:Ivy Events}
+      base-url: ${ZEPTO_BASE_URL:https://api.zeptomail.eu}
