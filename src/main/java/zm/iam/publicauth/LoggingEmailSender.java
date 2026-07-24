@@ -1,20 +1,19 @@
 package zm.iam.publicauth;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.stereotype.Component;
 
 /**
- * Fallback email sender — writes to the log instead of dialing SMTP.
- * Local dev + tests read the code from log lines; real environments
- * override with a ZeptoMail-backed bean (dedicated follow-up ticket).
- *
- * <p>{@code @ConditionalOnMissingBean} means "use me unless the
- * operator supplied something better" — no manual profile plumbing.
+ * The only {@link EmailSender} left in IAM — it just LOGS the message. Real
+ * email delivery moved to zm-notification-service: IAM emits events via
+ * {@link zm.iam.publicauth.notify.EventAuthNotificationGateway} when
+ * {@code iam.notifications.via-events=true}. This sender is the fallback used
+ * by {@link zm.iam.publicauth.notify.LocalEmailAuthNotificationGateway} in
+ * environments without Kafka — the code is readable from the log line so local
+ * dev / tests still work.
  */
 @Slf4j
 @Component
-@ConditionalOnMissingBean(name = "zeptoMailEmailSender")
 public class LoggingEmailSender implements EmailSender {
 
     @Override

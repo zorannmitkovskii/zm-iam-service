@@ -17,11 +17,6 @@ iam:
     base-url: ${KEYCLOAK_BASE_URL:http://localhost:8181}
     admin-client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:admin-service}
     admin-client-secret: ${KEYCLOAK_ADMIN_CLIENT_SECRET:change-me-local-only}
-  # Local dev logs the verification code (LoggingEmailSender) instead of
-  # hitting the real ZeptoMail API.
-  email:
-    zepto:
-      enabled: false
 
 logging:
   level:

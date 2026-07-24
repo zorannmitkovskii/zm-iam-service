@@ -1,11 +1,12 @@
 package zm.iam.publicauth;
 
 /**
- * Boundary for outbound transactional email. IAM-10 ships two
- * implementations: {@link LoggingEmailSender} (default — writes an INFO
- * line so local dev + tests can inspect the code without a real SMTP)
- * and — when the ZeptoMail integration lands as its own IAM ticket —
- * {@code ZeptoMailEmailSender} that hits the real HTTP API.
+ * Boundary for outbound transactional email. The only implementation left
+ * is {@link LoggingEmailSender} (writes an INFO line so local dev + tests can
+ * read the code without a real provider). REAL delivery moved out of IAM to
+ * zm-notification-service — IAM emits a Kafka event via
+ * {@link zm.iam.publicauth.notify.EventAuthNotificationGateway}; this sender
+ * is only the no-Kafka fallback.
  *
  * <p>Templates are realm-aware ({@link EmailTemplate#brand} carries the
  * app name/link overrides). Ivy sees the same subject lines it sees

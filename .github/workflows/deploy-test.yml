@@ -89,6 +89,7 @@ jobs:
               -e SPRING_PROFILES_ACTIVE=test \
               -e SERVER_PORT=8383 \
               -e 'SPRING_APPLICATION_JSON={"iam.public-auth.origin-to-realm":{"test.ivyevents.mk":"event-app"}}' \
+              -e IAM_PROVISIONING_SECURITY_ENABLED=false \
               zmtechlabs/zm-iam-service:latest
 
             echo "✅ IAM (test) deployed successfully"

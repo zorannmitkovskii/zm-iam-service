@@ -11,6 +11,7 @@ import zm.iam.common.exception.DuplicateResourceException;
 import zm.iam.common.exception.ErrorCode;
 import zm.iam.common.exception.ResourceNotFoundException;
 import zm.iam.keycloak.KeycloakAdminApi;
+import zm.iam.publicauth.notify.AuthNotificationGateway;
 import zm.iam.publicauth.dto.LoginRequest;
 import zm.iam.publicauth.dto.PasswordResetConfirmDto;
 import zm.iam.publicauth.dto.PasswordResetRequestDto;
@@ -44,18 +45,18 @@ public class PublicAuthService {
 
     private final KeycloakAdminApi keycloak;
     private final VerificationCodeService codes;
-    private final EmailSender email;
+    private final AuthNotificationGateway notifications;
     private final KeycloakTokenClient tokens;
     private final AuditService audit;
 
     public PublicAuthService(KeycloakAdminApi keycloak,
                               VerificationCodeService codes,
-                              EmailSender email,
+                              AuthNotificationGateway notifications,
                               KeycloakTokenClient tokens,
                               AuditService audit) {
         this.keycloak = keycloak;
         this.codes = codes;
-        this.email = email;
+        this.notifications = notifications;
         this.tokens = tokens;
         this.audit = audit;
     }
@@ -74,8 +75,7 @@ public class PublicAuthService {
         keycloak.resetUserPassword(realm, userId, req.password(), /* temporary */ false);
 
         String code = codes.issue(realm, req.email(), VerificationPurpose.EMAIL_VERIFY);
-        email.send(realm, req.email(),
-                EmailSender.EmailTemplate.verificationCode(code, brandFor(realm)));
+        notifications.emailVerification(realm, req.email(), code);
 
         audit.record(auditEvt(req.email(), realm, "REGISTER", true,
                 Map.of("userId", userId)));
@@ -137,8 +137,7 @@ public class PublicAuthService {
         Optional<UserRepresentation> maybe = keycloak.findUserByEmail(realm, req.email());
         if (maybe.isPresent()) {
             String code = codes.issue(realm, req.email(), VerificationPurpose.PASSWORD_RESET);
-            email.send(realm, req.email(),
-                    EmailSender.EmailTemplate.passwordResetCode(code, brandFor(realm)));
+            notifications.passwordReset(realm, req.email(), code);
         } else {
             log.info("[PublicAuth] Password reset requested for unknown email={} realm={} — silent 200",
                     req.email(), realm);
@@ -177,16 +176,6 @@ public class PublicAuthService {
                     "Too many wrong attempts — request a new code");
             default -> new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR,
                     "Unexpected verification outcome");
-        };
-    }
-
-    private static String brandFor(String realm) {
-        // Placeholder — a proper template registry maps realm → brand
-        // strings + link overrides. Ivy stays the only realm we brand
-        // for today so a straight passthrough is fine.
-        return switch (realm) {
-            case "event-app" -> "Ivy Events";
-            default -> realm;
         };
     }
 
