@@ -1,20 +1,29 @@
 package zm.iam.user;
 
+import jakarta.validation.Valid;
 import jakarta.ws.rs.NotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import zm.iam.common.ApiResponse;
+import zm.iam.common.exception.BusinessException;
+import zm.iam.common.exception.ErrorCode;
+import zm.iam.keycloak.KeycloakAdminApi;
+import zm.iam.user.dto.AttributePatchRequest;
 import zm.iam.keycloak.KeycloakAdminSession;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Placeholder for the internal user-management HTTP surface. IAM-09
@@ -41,9 +50,11 @@ import java.util.Map;
 public class UserController {
 
     private final KeycloakAdminSession session;
+    private final KeycloakAdminApi keycloak;
 
-    public UserController(KeycloakAdminSession session) {
+    public UserController(KeycloakAdminSession session, KeycloakAdminApi keycloak) {
         this.session = session;
+        this.keycloak = keycloak;
     }
 
     /**
@@ -85,6 +96,53 @@ public class UserController {
                 "count", users.size(),
                 "users", users.stream().map(UserController::project).toList()
         )));
+    }
+
+    /**
+     * Applies set / append / remove to one user's attributes.
+     *
+     * <p>This is what puts an event in a user's {@code eventIds}. Ivy calls it
+     * whenever an event is created: it is the only writer, because access is
+     * decided from that claim and nothing else, and because ivy-events-be is
+     * not allowed near the Keycloak Admin API.
+     *
+     * <p>The three buckets are applied in the order named. A key present in
+     * both {@code set} and {@code append} is a caller bug — the two disagree
+     * about what the attribute should end up as — and is refused rather than
+     * silently resolved by ordering.
+     *
+     * <p>An attribute must be declared in the realm's user profile or Keycloak
+     * discards it without complaint: the write returns 204 and stores nothing.
+     * That is not theoretical — it is exactly how {@code eventIds} came to be
+     * empty for every user while the code writing it looked correct.
+     */
+    @PatchMapping("/{userId}/attributes")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> patchAttributes(
+            @PathVariable String userId,
+            @RequestParam String realm,
+            @Valid @RequestBody AttributePatchRequest request) {
+
+        if (request.set() != null && request.append() != null) {
+            Set<String> both = new java.util.HashSet<>(request.set().keySet());
+            both.retainAll(request.append().keySet());
+            if (!both.isEmpty()) {
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR,
+                        "set and append name the same attribute(s): " + both);
+            }
+        }
+
+        UserRepresentation updated = keycloak.patchUserAttributes(
+                realm, userId, request.set(), request.append(), request.remove());
+
+        return ResponseEntity.ok(ApiResponse.ok(projectWithAttributes(updated)));
+    }
+
+    /** Same projection as {@link #project}, plus the attributes the caller
+     *  just changed — a caller that patches wants to see the result. */
+    private static Map<String, Object> projectWithAttributes(UserRepresentation u) {
+        Map<String, Object> m = new java.util.LinkedHashMap<>(project(u));
+        m.put("attributes", u.getAttributes() == null ? Map.of() : u.getAttributes());
+        return m;
     }
 
     /** Project only the fields safe to expose over the internal API —

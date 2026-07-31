@@ -120,7 +120,7 @@ class OwnershipIT {
                 new RealmDeclaration("zm-a-svc-owner-realm", null, null, null, null, null),
                 new RealmDeclaration("zm-services", null,
                         List.of(new ClientDeclaration("zm-a-svc-owner-svc",
-                                ClientType.CONFIDENTIAL, null, null, null, true,
+                                ClientType.CONFIDENTIAL, null, null, null, true, null,
                                 List.of("iam-client"), null)),
                         null, null, null)));
 
@@ -144,7 +144,7 @@ class OwnershipIT {
         return new ServiceProvisioningManifest(svc, version, List.of(
                 new RealmDeclaration(realmName, null,
                         List.of(new ClientDeclaration(clientId, ClientType.PUBLIC, null,
-                                List.of("https://x.mk/*"), null, null, null, null)),
+                                List.of("https://x.mk/*"), null, null, null, null, null)),
                         null, null, null)));
     }
 }

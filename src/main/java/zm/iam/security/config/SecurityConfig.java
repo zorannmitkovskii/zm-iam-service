@@ -13,6 +13,7 @@ import org.springframework.security.oauth2.jwt.SupplierJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfigurationSource;
 import zm.iam.keycloak.config.KeycloakProperties;
 import zm.iam.security.internal.KeycloakRealmRolesJwtConverter;
 import zm.iam.security.internal.RealmScopeAuthorizationFilter;
@@ -110,15 +111,19 @@ public class SecurityConfig {
     // mapping) at the service layer.
     @Bean
     @Order(3)
-    public SecurityFilterChain publicAuthFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain publicAuthFilterChain(
+            HttpSecurity http,
+            CorsConfigurationSource publicAuthCorsSource) throws Exception {
         http
                 .securityMatcher("/public/**")
                 .csrf(AbstractHttpConfigurer::disable)
-                // CORS matters here — browsers hit this chain directly.
-                // Global CORS config would work; we leave it disabled at
-                // the security layer and rely on the nginx CORS response
-                // in front (matching current ivy-events-be topology).
-                .cors(AbstractHttpConfigurer::disable)
+                // Browsers reach this chain directly — a frontend posts its
+                // login form here from its own origin — so CORS is answered
+                // here rather than assumed to come from a proxy in front.
+                // Allowed origins are configured, never wildcarded: the same
+                // Origin header picks the Keycloak realm downstream, so
+                // accepting an unknown one is not a preflight detail.
+                .cors(cors -> cors.configurationSource(publicAuthCorsSource))
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
         return http.build();

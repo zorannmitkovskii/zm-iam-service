@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.resource.ClientResource;
 import org.keycloak.admin.client.resource.RealmResource;
+import org.keycloak.admin.client.resource.UserResource;
 import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.CredentialRepresentation;
 import org.keycloak.representations.idm.IdentityProviderRepresentation;
@@ -15,7 +16,10 @@ import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -196,6 +200,36 @@ public class KeycloakAdminApi {
         }
     }
 
+    /** Realm role names already granted to a user, realm-level only. */
+    public List<String> userRealmRoleNames(String realmName, String userId) {
+        try (Keycloak admin = session.client()) {
+            return admin.realm(realmName).users().get(userId)
+                    .roles().realmLevel().listEffective().stream()
+                    .map(RoleRepresentation::getName)
+                    .toList();
+        }
+    }
+
+    /**
+     * The user Keycloak creates behind a client with service accounts enabled.
+     * Realm roles are granted to that user, not to the client, which is why
+     * assigning a service account role needs this indirection.
+     */
+    public Optional<String> findServiceAccountUserId(String realmName, String clientId) {
+        try (Keycloak admin = session.client()) {
+            Optional<ClientRepresentation> client = admin.realm(realmName)
+                    .clients().findByClientId(clientId).stream().findFirst();
+            if (client.isEmpty()) {
+                return Optional.empty();
+            }
+            UserRepresentation serviceAccount = admin.realm(realmName)
+                    .clients().get(client.get().getId()).getServiceAccountUser();
+            return Optional.ofNullable(serviceAccount).map(UserRepresentation::getId);
+        } catch (NotFoundException e) {
+            return Optional.empty();
+        }
+    }
+
     // ── IAM-10 user operations ──────────────────────────────────────
 
     /** Exact-email search inside a realm. Returns empty when not found. */
@@ -258,6 +292,83 @@ public class KeycloakAdminApi {
             admin.realm(realmName).users().get(userId).resetPassword(cred);
             log.info("[KeycloakAdminApi] Reset password for user id={} realm='{}' (temporary={})",
                     userId, realmName, temporary);
+        }
+    }
+
+    /**
+     * Applies set → append → remove to a user's attributes in that order, and
+     * returns the user as it now stands.
+     *
+     * <p>Append is what Ivy needs on every event creation: one more id in
+     * {@code eventIds}, without knowing or clobbering what is already there.
+     * Reading, merging and writing in one call is what keeps two events
+     * created at the same time from erasing each other — the read-modify-write
+     * a caller would otherwise do outside this method has no such protection.
+     *
+     * <p>Appending a value that is already present is a no-op rather than a
+     * duplicate: the attribute is a set of ids in all but name, and a token
+     * carrying the same event twice helps nobody.
+     */
+    public UserRepresentation patchUserAttributes(String realmName, String userId,
+                                                   Map<String, List<String>> set,
+                                                   Map<String, List<String>> append,
+                                                   Map<String, List<String>> remove) {
+        try (Keycloak admin = session.client()) {
+            UserResource resource = admin.realm(realmName).users().get(userId);
+            UserRepresentation user = resource.toRepresentation();
+
+            Map<String, List<String>> attributes = user.getAttributes() == null
+                    ? new HashMap<>()
+                    : new HashMap<>(user.getAttributes());
+
+            if (set != null) {
+                set.forEach((key, values) -> attributes.put(key, new ArrayList<>(values)));
+            }
+            if (append != null) {
+                append.forEach((key, values) -> {
+                    List<String> current = new ArrayList<>(
+                            attributes.getOrDefault(key, List.of()));
+                    values.stream().filter(v -> !current.contains(v)).forEach(current::add);
+                    attributes.put(key, current);
+                });
+            }
+            if (remove != null) {
+                remove.forEach((key, values) -> {
+                    List<String> current = new ArrayList<>(
+                            attributes.getOrDefault(key, List.of()));
+                    current.removeAll(values);
+                    if (current.isEmpty()) {
+                        attributes.remove(key);
+                    } else {
+                        attributes.put(key, current);
+                    }
+                });
+            }
+
+            user.setAttributes(attributes);
+            resource.update(user);
+            log.info("[KeycloakAdminApi] Patched attributes for user id={} realm='{}' keys={}",
+                    userId, realmName, attributes.keySet());
+            return resource.toRepresentation();
+        }
+    }
+
+    /** Drop a single user attribute. A user who has no such attribute is
+     *  left untouched — callers use this to clear a one-shot flag
+     *  ({@code mustChangePassword}) and must not care whether it was set. */
+    public void removeUserAttribute(String realmName, String userId, String key) {
+        try (Keycloak admin = session.client()) {
+            UserResource resource = admin.realm(realmName).users().get(userId);
+            UserRepresentation user = resource.toRepresentation();
+            Map<String, List<String>> attributes = user.getAttributes();
+            if (attributes == null || !attributes.containsKey(key)) return;
+            // toRepresentation may hand back an immutable map.
+            Map<String, List<String>> copy = new HashMap<>(attributes);
+            copy.remove(key);
+            user.setAttributes(copy);
+            resource.update(user);
+            log.info("[KeycloakAdminApi] Removed attribute '{}' from user id={} realm='{}'",
+                    key, userId, realmName);
         }
     }
 

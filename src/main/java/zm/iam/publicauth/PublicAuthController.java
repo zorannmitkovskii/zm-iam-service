@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 import zm.iam.common.ApiResponse;
 import zm.iam.common.exception.BusinessException;
 import zm.iam.common.exception.ErrorCode;
+import zm.iam.publicauth.dto.ChangePasswordRequest;
 import zm.iam.publicauth.dto.LoginRequest;
 import zm.iam.publicauth.dto.PasswordResetConfirmDto;
 import zm.iam.publicauth.dto.PasswordResetRequestDto;
@@ -95,9 +96,24 @@ public class PublicAuthController {
         return ResponseEntity.ok(tokens);
     }
 
-    // ── /password-reset ──────────────────────────────────────────
+    // ── /users/change-password ───────────────────────────────────
 
-    @PostMapping("/password-reset/request")
+    @PostMapping("/users/change-password")
+    public ResponseEntity<ApiResponse<Void>> changePassword(
+            @Valid @RequestBody ChangePasswordRequest req,
+            @RequestHeader(value = "Origin", required = false) String origin) {
+        String realm = requireRealm(origin, req.appId());
+        service.changePassword(realm, req);
+        return ResponseEntity.ok(ApiResponse.ok(null));
+    }
+
+    // ── /auth/password-reset ─────────────────────────────────────
+    // Nested under /auth to match the path ivy-events-be served before
+    // IAM took the flow over. Getting this wrong means the edge routes
+    // the request here and the FE gets a 404 on "forgot password" only
+    // — login and register would still work, so it hides well.
+
+    @PostMapping("/auth/password-reset/request")
     public ResponseEntity<ApiResponse<Void>> passwordResetRequest(
             @Valid @RequestBody PasswordResetRequestDto req,
             @RequestHeader(value = "Origin", required = false) String origin,
@@ -113,7 +129,7 @@ public class PublicAuthController {
         return ResponseEntity.ok(ApiResponse.ok(null));
     }
 
-    @PostMapping("/password-reset/confirm")
+    @PostMapping("/auth/password-reset/confirm")
     public ResponseEntity<ApiResponse<Void>> passwordResetConfirm(
             @Valid @RequestBody PasswordResetConfirmDto req,
             @RequestHeader(value = "Origin", required = false) String origin) {

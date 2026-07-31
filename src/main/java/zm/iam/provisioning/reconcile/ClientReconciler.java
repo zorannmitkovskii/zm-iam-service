@@ -66,7 +66,11 @@ public class ClientReconciler {
         if (decl.serviceAccountsEnabled() != null) target.setServiceAccountsEnabled(decl.serviceAccountsEnabled());
         target.setStandardFlowEnabled(!confidential
                 || (decl.redirectUris() != null && !decl.redirectUris().isEmpty()));
-        target.setDirectAccessGrantsEnabled(false);
+        // Off unless the manifest asks for it. It used to be unconditionally
+        // off, which silently contradicted IAM's own /public/users/login —
+        // that endpoint runs a password grant, so every login against an
+        // IAM-provisioned client failed with unauthorized_client.
+        target.setDirectAccessGrantsEnabled(Boolean.TRUE.equals(decl.directAccessGrantsEnabled()));
     }
 
     private static List<String> diff(ClientRepresentation existing, ClientDeclaration decl) {
@@ -83,6 +87,12 @@ public class ClientReconciler {
         if (decl.serviceAccountsEnabled() != null
                 && !decl.serviceAccountsEnabled().equals(existing.isServiceAccountsEnabled()))
             diffs.add("serviceAccountsEnabled");
+        // Compared even when the declaration omits it: the desired state for
+        // null is false, and an already-provisioned client left on true has
+        // to be brought back down.
+        if (Boolean.TRUE.equals(decl.directAccessGrantsEnabled())
+                != Boolean.TRUE.equals(existing.isDirectAccessGrantsEnabled()))
+            diffs.add("directAccessGrantsEnabled");
         if (decl.pkce() != null) {
             String current = existing.getAttributes() == null ? ""
                     : existing.getAttributes().getOrDefault("pkce.code.challenge.method", "");

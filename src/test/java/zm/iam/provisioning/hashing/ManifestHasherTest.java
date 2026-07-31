@@ -58,7 +58,7 @@ class ManifestHasherTest {
         var mutatedClient = new ClientDeclaration(
                 "eventFE", ClientType.PUBLIC, true,
                 List.of("https://evil.com/*"),
-                null, null, null, null);
+                null, null, null, null, null);
         var b = new ServiceProvisioningManifest(a.serviceId(), a.manifestVersion(), List.of(
                 new RealmDeclaration("event-app", null, List.of(mutatedClient),
                         null, null, null)));
@@ -81,7 +81,7 @@ class ManifestHasherTest {
         var client = new ClientDeclaration(
                 "eventFE", ClientType.PUBLIC, true,
                 List.of("https://ivyevents.mk/*"),
-                List.of("+"), null, null, null);
+                List.of("+"), null, null, null, null);
         return new ServiceProvisioningManifest("ivy-events-be", 3, List.of(
                 new RealmDeclaration("event-app", null, List.of(client),
                         List.of("USER"), null, null)));

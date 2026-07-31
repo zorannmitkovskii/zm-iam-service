@@ -108,7 +108,7 @@ class ConcurrencyIT {
     private static ServiceProvisioningManifest manifest(String serviceId, int version, String redirectUri) {
         ClientDeclaration client = new ClientDeclaration(
                 "concurrency-fe", ClientType.PUBLIC, null,
-                List.of(redirectUri), null, null, null, null);
+                List.of(redirectUri), null, null, null, null, null);
         return new ServiceProvisioningManifest(serviceId, version, List.of(
                 new RealmDeclaration("concurrency-realm", null, List.of(client),
                         null, null, null)));

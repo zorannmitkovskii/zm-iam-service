@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
-/** POST /public/password-reset/confirm — validates code + sets new password. */
+/** POST /public/auth/password-reset/confirm — validates code + sets new password. */
 public record PasswordResetConfirmDto(
         @NotBlank @Email String email,
         @NotBlank @Pattern(regexp = "\\d{6}") String code,

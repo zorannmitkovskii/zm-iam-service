@@ -191,7 +191,7 @@ public class ProvisioningIT {
         ClientDeclaration client = new ClientDeclaration(
                 "eventFE", ClientType.PUBLIC, true,
                 List.of(redirectUri), List.of("+"),
-                null, null, mappers);
+                null, null, null, mappers);
         return new ServiceProvisioningManifest("ivy-events-be-it", version, List.of(
                 new RealmDeclaration("event-app-it", null, List.of(client),
                         List.of("USER", "ADMIN"), null, null)));

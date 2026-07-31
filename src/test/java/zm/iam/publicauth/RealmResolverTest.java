@@ -19,6 +19,10 @@ class RealmResolverTest {
                 "ivyevents.mk", "event-app",
                 "test.ivyevents.mk", "event-app",
                 "localhost", "event-app",
+                // Port-qualified keys — how docker-compose configures the
+                // local frontends, which all share the host "localhost".
+                "localhost:5173", "event-app",
+                "localhost:5174", "menu-app",
                 "presmetko.mk", "presmetko"));
         props.setAppIdToRealm(Map.of(
                 "ivy", "event-app",
@@ -34,10 +38,31 @@ class RealmResolverTest {
     }
 
     @Test
-    @DisplayName("Origin with port + path → host extracted correctly")
-    void originStripsPortAndPath() {
+    @DisplayName("Origin with port + path → port-qualified key matches, path ignored")
+    void portQualifiedKeyMatchesAndPathIgnored() {
         assertThat(resolver.resolve("http://localhost:5173/path", null))
                 .contains("event-app");
+    }
+
+    @Test
+    @DisplayName("Two frontends on localhost resolve to their own realms, not a shared one")
+    void portDistinguishesFrontendsOnTheSameHost() {
+        assertThat(resolver.resolve("http://localhost:5173", null)).contains("event-app");
+        assertThat(resolver.resolve("http://localhost:5174", null)).contains("menu-app");
+    }
+
+    @Test
+    @DisplayName("Unmapped port falls back to the bare-host mapping")
+    void unmappedPortFallsBackToHost() {
+        assertThat(resolver.resolve("http://localhost:9999", null))
+                .contains("event-app");
+    }
+
+    @Test
+    @DisplayName("Deployed origin on the default port matches its bare-host key")
+    void deployedOriginMatchesBareHostKey() {
+        assertThat(resolver.resolve("https://ivyevents.mk", null)).contains("event-app");
+        assertThat(resolver.resolve("https://presmetko.mk/", null)).contains("presmetko");
     }
 
     @Test

@@ -20,6 +20,7 @@ import zm.iam.provisioning.reconcile.IdpReconciler;
 import zm.iam.provisioning.reconcile.ProtocolMapperReconciler;
 import zm.iam.provisioning.reconcile.RealmReconciler;
 import zm.iam.provisioning.reconcile.RoleReconciler;
+import zm.iam.provisioning.reconcile.ServiceAccountRoleReconciler;
 import zm.iam.audit.AuditEvent;
 import zm.iam.audit.AuditService;
 import zm.iam.audit.TargetType;
@@ -63,6 +64,7 @@ public class ProvisioningService {
     private final ClientReconciler clientReconciler;
     private final ProtocolMapperReconciler mapperReconciler;
     private final RoleReconciler roleReconciler;
+    private final ServiceAccountRoleReconciler serviceAccountRoleReconciler;
     private final IdpReconciler idpReconciler;
     private final AuditService audit;
 
@@ -84,6 +86,7 @@ public class ProvisioningService {
                                ClientReconciler clientReconciler,
                                ProtocolMapperReconciler mapperReconciler,
                                RoleReconciler roleReconciler,
+                               ServiceAccountRoleReconciler serviceAccountRoleReconciler,
                                IdpReconciler idpReconciler,
                                AuditService audit) {
         this.repository = repository;
@@ -95,6 +98,7 @@ public class ProvisioningService {
         this.clientReconciler = clientReconciler;
         this.mapperReconciler = mapperReconciler;
         this.roleReconciler = roleReconciler;
+        this.serviceAccountRoleReconciler = serviceAccountRoleReconciler;
         this.idpReconciler = idpReconciler;
         this.audit = audit;
     }
@@ -141,6 +145,11 @@ public class ProvisioningService {
                 acquireRealmLock(realm.name());
                 appliedSteps.addAll(realmReconciler.reconcile(realm));
 
+                // Realm roles are reconciled BEFORE clients: a service account
+                // cannot be granted a role that does not exist yet, and the
+                // client step now grants the roles each client declares.
+                appliedSteps.addAll(roleReconciler.reconcile(realm.name(), realm.realmRoles()));
+
                 if (realm.clients() != null) {
                     for (ClientDeclaration clientDecl : realm.clients()) {
                         appliedSteps.addAll(clientReconciler.reconcile(realm.name(), clientDecl));
@@ -154,9 +163,10 @@ public class ProvisioningService {
                                     realm.name(), current.get().getId(),
                                     clientDecl, clientDecl.protocolMappers(), prevMappers));
                         }
+                        appliedSteps.addAll(
+                                serviceAccountRoleReconciler.reconcile(realm.name(), clientDecl));
                     }
                 }
-                appliedSteps.addAll(roleReconciler.reconcile(realm.name(), realm.realmRoles()));
                 appliedSteps.addAll(idpReconciler.reconcile(realm.name(), realm.identityProviders()));
             }
         } catch (RuntimeException e) {

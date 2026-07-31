@@ -97,7 +97,7 @@ class ManifestValidationTest {
     void zmServicesForeignClientRejected() {
         ClientDeclaration foreign = new ClientDeclaration(
                 "evil-client", ClientType.CONFIDENTIAL,
-                null, null, null, null, null, null);
+                null, null, null, null, null, null, null);
         RealmDeclaration zm = new RealmDeclaration(
                 ServiceProvisioningManifest.ZM_SERVICES_REALM,
                 null, List.of(foreign), null, null, null);
@@ -110,7 +110,7 @@ class ManifestValidationTest {
     void zmServicesCorrectClientAccepted() {
         ClientDeclaration ok = new ClientDeclaration(
                 "ivy-events-be-svc", ClientType.CONFIDENTIAL,
-                null, null, null, true, List.of("iam-client"), null);
+                null, null, null, true, null, List.of("iam-client"), null);
         RealmDeclaration zm = new RealmDeclaration(
                 ServiceProvisioningManifest.ZM_SERVICES_REALM,
                 null, List.of(ok), null, null, null);
@@ -125,7 +125,7 @@ class ManifestValidationTest {
     void clientIdRejectsSpace() {
         ClientDeclaration bad = new ClientDeclaration(
                 "bad client", ClientType.PUBLIC,
-                null, null, null, null, null, null);
+                null, null, null, null, null, null, null);
         var m = new ServiceProvisioningManifest("svc", 1, List.of(
                 new RealmDeclaration("r", null, List.of(bad), null, null, null)
         ));

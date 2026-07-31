@@ -67,7 +67,7 @@ class OwnershipServiceTest {
                 .thenReturn(Optional.empty());
 
         var manifest = manifest("service-a", 1, realm("event-app", List.of(
-                new ClientDeclaration("eventFE", ClientType.PUBLIC, null, null, null, null, null, null)),
+                new ClientDeclaration("eventFE", ClientType.PUBLIC, null, null, null, null, null, null, null)),
                 null));
 
         service.check("service-a", manifest);
@@ -85,7 +85,7 @@ class OwnershipServiceTest {
         var manifest = new ServiceProvisioningManifest("ivy-events-be", 1, List.of(
                 new RealmDeclaration("zm-services", null,
                         List.of(new ClientDeclaration("ivy-events-be-svc", ClientType.CONFIDENTIAL,
-                                null, null, null, true, List.of("iam-client"), null)),
+                                null, null, null, true, null, List.of("iam-client"), null)),
                         null, null, null)));
 
         when(repo.findByResourceTypeAndRealmAndResourceName(any(), any(), any()))

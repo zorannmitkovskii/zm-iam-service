@@ -149,11 +149,11 @@ class InternalAuthIT {
         ClientDeclaration svcClient = new ClientDeclaration(
                 IVY_SVC_CLIENT_ID, ClientType.CONFIDENTIAL, false,
                 null, null,
-                true, List.of("iam-client"), null);
+                true, null, List.of("iam-client"), null);
         ClientDeclaration feClient = new ClientDeclaration(
                 "eventFE-it", ClientType.PUBLIC, true,
                 List.of("https://example.mk/*"), List.of("+"),
-                null, null, null);
+                null, null, null, null);
         ServiceProvisioningManifest manifest = new ServiceProvisioningManifest(
                 "ivy-events-be", 1, List.of(
                 new RealmDeclaration(EVENT_APP_REALM, null, List.of(feClient),
@@ -309,11 +309,11 @@ class InternalAuthIT {
         String newRealm = "event-app-secondary-it";
         ClientDeclaration svcClient = new ClientDeclaration(
                 IVY_SVC_CLIENT_ID, ClientType.CONFIDENTIAL, false,
-                null, null, true, List.of("iam-client"), null);
+                null, null, true, null, List.of("iam-client"), null);
         ClientDeclaration feClient = new ClientDeclaration(
                 "feSecondary", ClientType.PUBLIC, true,
                 List.of("https://example.mk/*"), List.of("+"),
-                null, null, null);
+                null, null, null, null);
         ServiceProvisioningManifest v2 = new ServiceProvisioningManifest(
                 "ivy-events-be", 2, List.of(
                 new RealmDeclaration(newRealm, null, List.of(feClient),

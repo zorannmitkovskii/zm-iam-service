@@ -38,6 +38,19 @@ public record ClientDeclaration(
 
         Boolean serviceAccountsEnabled,
 
+        /**
+         * Enables the OAuth2 password (ROPC) grant. Defaults to false when
+         * null, and that default should stand for almost every client — the
+         * browser-redirect flow is the one to reach for.
+         *
+         * <p>The exception is a frontend whose login form posts to IAM's
+         * {@code /public/users/login}: that endpoint exchanges the
+         * credentials for tokens with exactly this grant, so a client
+         * serving such a frontend has to opt in or every login returns
+         * {@code unauthorized_client}.
+         */
+        Boolean directAccessGrantsEnabled,
+
         /** Realm-level roles bound to the service account. Null for public clients. */
         List<@NotBlank String> serviceAccountRoles,
 

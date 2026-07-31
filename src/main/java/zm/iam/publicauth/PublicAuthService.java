@@ -12,6 +12,7 @@ import zm.iam.common.exception.ErrorCode;
 import zm.iam.common.exception.ResourceNotFoundException;
 import zm.iam.keycloak.KeycloakAdminApi;
 import zm.iam.publicauth.notify.AuthNotificationGateway;
+import zm.iam.publicauth.dto.ChangePasswordRequest;
 import zm.iam.publicauth.dto.LoginRequest;
 import zm.iam.publicauth.dto.PasswordResetConfirmDto;
 import zm.iam.publicauth.dto.PasswordResetRequestDto;
@@ -24,9 +25,9 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Coordinator for the four public auth flows: register, verify email,
- * login, password reset (request + confirm). Delegates to specialised
- * collaborators; keeps its own logic thin.
+ * Coordinator for the public auth flows: register, verify email, login,
+ * password reset (request + confirm) and change password. Delegates to
+ * specialised collaborators; keeps its own logic thin.
  *
  * <p>Order-of-operations for register:
  * <ol>
@@ -42,6 +43,10 @@ import java.util.Optional;
 @Slf4j
 @Service
 public class PublicAuthService {
+
+    /** Keycloak user attribute marking an account still on its
+     *  provisioned temporary password. */
+    private static final String MUST_CHANGE_PASSWORD_ATTR = "mustChangePassword";
 
     private final KeycloakAdminApi keycloak;
     private final VerificationCodeService codes;
@@ -161,6 +166,35 @@ public class PublicAuthService {
                         "User with email '" + req.email() + "' not found in realm '" + realm + "'"));
         keycloak.resetUserPassword(realm, user.getId(), req.newPassword(), /* temporary */ false);
         audit.record(auditEvt(req.email(), realm, "PASSWORD_RESET_CONFIRM", true,
+                Map.of("userId", user.getId())));
+    }
+
+    // ── Change password ──────────────────────────────────────────
+
+    /**
+     * Change a password for a caller who proves the current one. The proof
+     * is a password grant against the realm — the same check Keycloak would
+     * apply at login, so a wrong current password fails here exactly as it
+     * would there, brute-force policy included.
+     *
+     * <p>Clears {@code mustChangePassword} on success: an account
+     * provisioned with a temporary password carries that flag, and leaving
+     * it set would send the user back through this flow on every login.
+     */
+    public void changePassword(String realm, ChangePasswordRequest req) {
+        try {
+            tokens.passwordGrant(realm, req.email(), req.currentPassword());
+        } catch (KeycloakTokenClient.PasswordGrantException e) {
+            audit.record(auditEvt(req.email(), realm, "CHANGE_PASSWORD", false,
+                    Map.of("reason", "bad_current_password", "keycloakStatus", e.getStatus())));
+            throw new BusinessException(ErrorCode.AUTHN_FAILED, "Current password is incorrect");
+        }
+        UserRepresentation user = keycloak.findUserByEmail(realm, req.email())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "User with email '" + req.email() + "' not found in realm '" + realm + "'"));
+        keycloak.resetUserPassword(realm, user.getId(), req.newPassword(), /* temporary */ false);
+        keycloak.removeUserAttribute(realm, user.getId(), MUST_CHANGE_PASSWORD_ATTR);
+        audit.record(auditEvt(req.email(), realm, "CHANGE_PASSWORD", true,
                 Map.of("userId", user.getId())));
     }
 
