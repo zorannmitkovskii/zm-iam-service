@@ -75,7 +75,7 @@ class AuditIT {
                 "audit-it-svc", 1, List.of(
                 new RealmDeclaration("audit-it-realm", null, List.of(
                         new ClientDeclaration("audit-it-fe", ClientType.PUBLIC, null,
-                                List.of("https://audit.example/*"), null, null, null, null, null)),
+                                List.of("https://audit.example/*"), null, null, null, null, null, null)),
                         null, null, null)));
         ApplyResult result = service.apply(manifest);
         assertThat(result.status()).isEqualTo(ApplyResult.Status.APPLIED);
@@ -105,7 +105,7 @@ class AuditIT {
                 "audit-noop-svc", 5, List.of(
                 new RealmDeclaration("audit-noop-realm", null, List.of(
                         new ClientDeclaration("noop-fe", ClientType.PUBLIC, null,
-                                List.of("https://x.mk/*"), null, null, null, null, null)),
+                                List.of("https://x.mk/*"), null, null, null, null, null, null)),
                         null, null, null)));
         service.apply(manifest);  // first — APPLIED
         long afterApply = eventuallyAtLeastOneRowThenCount();

@@ -30,7 +30,7 @@ class ServiceAccountRoleReconcilerTest {
 
     private static ClientDeclaration declaring(List<String> roles) {
         return new ClientDeclaration(CLIENT, ClientType.CONFIDENTIAL, null, null, null,
-                true, null, roles, null);
+                true, null, null, roles, null);
     }
 
     @BeforeEach

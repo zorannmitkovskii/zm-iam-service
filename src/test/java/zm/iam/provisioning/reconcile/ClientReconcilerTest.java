@@ -30,7 +30,7 @@ class ClientReconcilerTest {
         List<ChangeEntry> changes = new ClientReconciler(api).reconcile("app",
                 new ClientDeclaration("eventFE", ClientType.PUBLIC, true,
                         List.of("https://ivyevents.mk/*"), List.of("+"),
-                        null, null, null, null));
+                        null, null, null, null, null));
 
         verify(api).createClient(eq("app"), any(ClientRepresentation.class));
         assertThat(changes.get(0).action()).isEqualTo("CREATED");
@@ -50,7 +50,7 @@ class ClientReconcilerTest {
         List<ChangeEntry> changes = new ClientReconciler(api).reconcile("app",
                 new ClientDeclaration("eventFE", ClientType.PUBLIC, null,
                         List.of("https://ivyevents.mk/*"),
-                        null, null, null, null, null));
+                        null, null, null, null, null, null));
 
         verify(api, never()).updateClient(any(), any());
         assertThat(changes.get(0).action()).isEqualTo("SKIPPED");
@@ -70,7 +70,7 @@ class ClientReconcilerTest {
         List<ChangeEntry> changes = new ClientReconciler(api).reconcile("app",
                 new ClientDeclaration("eventFE", ClientType.PUBLIC, null,
                         List.of("https://new.mk/*"),
-                        null, null, null, null, null));
+                        null, null, null, null, null, null));
 
         verify(api).updateClient(eq("app"), any());
         assertThat(changes.get(0).action()).isEqualTo("UPDATED");
@@ -86,7 +86,7 @@ class ClientReconcilerTest {
         new ClientReconciler(api).reconcile("app",
                 new ClientDeclaration("eventFE", ClientType.PUBLIC, true,
                         List.of("https://ivyevents.mk/*"), List.of("+"),
-                        null, true, null, null));
+                        null, null, true, null, null));
 
         ArgumentCaptor<ClientRepresentation> sent = ArgumentCaptor.forClass(ClientRepresentation.class);
         verify(api).createClient(eq("app"), sent.capture());
@@ -102,7 +102,7 @@ class ClientReconcilerTest {
         new ClientReconciler(api).reconcile("app",
                 new ClientDeclaration("eventFE", ClientType.PUBLIC, true,
                         List.of("https://ivyevents.mk/*"), List.of("+"),
-                        null, null, null, null));
+                        null, null, null, null, null));
 
         ArgumentCaptor<ClientRepresentation> sent = ArgumentCaptor.forClass(ClientRepresentation.class);
         verify(api).createClient(eq("app"), sent.capture());
@@ -124,7 +124,7 @@ class ClientReconcilerTest {
         List<ChangeEntry> changes = new ClientReconciler(api).reconcile("app",
                 new ClientDeclaration("eventFE", ClientType.PUBLIC, null,
                         List.of("https://ivyevents.mk/*"),
-                        null, null, true, null, null));
+                        null, null, null, true, null, null));
 
         verify(api).updateClient(eq("app"), any());
         assertThat(changes.get(0).action()).isEqualTo("UPDATED");

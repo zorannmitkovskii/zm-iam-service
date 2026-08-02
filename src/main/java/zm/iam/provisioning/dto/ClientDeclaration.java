@@ -39,6 +39,19 @@ public record ClientDeclaration(
         Boolean serviceAccountsEnabled,
 
         /**
+         * Name of the environment variable holding this client's secret — the
+         * name, never the secret. Same rule as the identity-provider fields:
+         * a manifest is a document that gets logged, diffed and stored.
+         *
+         * <p>Only meaningful for a CONFIDENTIAL client. Without it Keycloak
+         * generates a secret nobody can predict, which is exactly the problem:
+         * the service that needs it has no way to learn it, so every
+         * client_credentials call comes back 401 and the failure reads like a
+         * broken credential rather than one that was never handed over.
+         */
+        String secretEnvRef,
+
+        /**
          * Enables the OAuth2 password (ROPC) grant. Defaults to false when
          * null, and that default should stand for almost every client — the
          * browser-redirect flow is the one to reach for.

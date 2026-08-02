@@ -34,7 +34,7 @@ import static org.mockito.Mockito.when;
 class ProtocolMapperReconcilerTest {
 
     private static final ClientDeclaration CLIENT_DECL = new ClientDeclaration(
-            "eventFE", ClientType.PUBLIC, null, null, null, null, null, null, null);
+            "eventFE", ClientType.PUBLIC, null, null, null, null, null, null, null, null);
 
     @Test
     @DisplayName("Missing mapper → CREATE")

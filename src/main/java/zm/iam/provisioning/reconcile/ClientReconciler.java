@@ -71,6 +71,28 @@ public class ClientReconciler {
         // that endpoint runs a password grant, so every login against an
         // IAM-provisioned client failed with unauthorized_client.
         target.setDirectAccessGrantsEnabled(Boolean.TRUE.equals(decl.directAccessGrantsEnabled()));
+
+        if (confidential && decl.secretEnvRef() != null && !decl.secretEnvRef().isBlank()) {
+            target.setSecret(requireEnv(decl.secretEnvRef(), decl.clientId()));
+        }
+    }
+
+    /**
+     * Resolves an {@code *EnvRef} against IAM's own environment.
+     *
+     * <p>Missing is fatal rather than skipped. A client silently left with a
+     * Keycloak-generated secret looks provisioned and fails only later, at the
+     * first call, in another service — which is the trail this method exists to
+     * stop anyone walking again.
+     */
+    private static String requireEnv(String variableName, String clientId) {
+        String value = System.getenv(variableName);
+        if (value == null || value.isBlank()) {
+            throw new IllegalStateException(
+                    "Client '" + clientId + "' declares secretEnvRef=" + variableName
+                            + " but that variable is not set on zm-iam-service");
+        }
+        return value;
     }
 
     private static List<String> diff(ClientRepresentation existing, ClientDeclaration decl) {
@@ -93,6 +115,12 @@ public class ClientReconciler {
         if (Boolean.TRUE.equals(decl.directAccessGrantsEnabled())
                 != Boolean.TRUE.equals(existing.isDirectAccessGrantsEnabled()))
             diffs.add("directAccessGrantsEnabled");
+        // Keycloak does not return the secret on read, so there is nothing to
+        // compare against. Declaring one means "make it this", every time —
+        // otherwise a client provisioned before the declaration existed would
+        // keep its generated secret forever.
+        if (decl.secretEnvRef() != null && !decl.secretEnvRef().isBlank())
+            diffs.add("secret");
         if (decl.pkce() != null) {
             String current = existing.getAttributes() == null ? ""
                     : existing.getAttributes().getOrDefault("pkce.code.challenge.method", "");
