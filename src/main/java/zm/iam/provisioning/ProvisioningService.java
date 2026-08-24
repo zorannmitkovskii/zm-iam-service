@@ -20,6 +20,7 @@ import zm.iam.provisioning.reconcile.IdpReconciler;
 import zm.iam.provisioning.reconcile.ProtocolMapperReconciler;
 import zm.iam.provisioning.reconcile.RealmReconciler;
 import zm.iam.provisioning.reconcile.RoleReconciler;
+import zm.iam.provisioning.reconcile.UserProfileReconciler;
 import zm.iam.provisioning.reconcile.ServiceAccountRoleReconciler;
 import zm.iam.audit.AuditEvent;
 import zm.iam.audit.AuditService;
@@ -64,6 +65,7 @@ public class ProvisioningService {
     private final ClientReconciler clientReconciler;
     private final ProtocolMapperReconciler mapperReconciler;
     private final RoleReconciler roleReconciler;
+    private final UserProfileReconciler userProfileReconciler;
     private final ServiceAccountRoleReconciler serviceAccountRoleReconciler;
     private final IdpReconciler idpReconciler;
     private final AuditService audit;
@@ -86,6 +88,7 @@ public class ProvisioningService {
                                ClientReconciler clientReconciler,
                                ProtocolMapperReconciler mapperReconciler,
                                RoleReconciler roleReconciler,
+                               UserProfileReconciler userProfileReconciler,
                                ServiceAccountRoleReconciler serviceAccountRoleReconciler,
                                IdpReconciler idpReconciler,
                                AuditService audit) {
@@ -98,6 +101,7 @@ public class ProvisioningService {
         this.clientReconciler = clientReconciler;
         this.mapperReconciler = mapperReconciler;
         this.roleReconciler = roleReconciler;
+        this.userProfileReconciler = userProfileReconciler;
         this.serviceAccountRoleReconciler = serviceAccountRoleReconciler;
         this.idpReconciler = idpReconciler;
         this.audit = audit;
@@ -149,6 +153,13 @@ public class ProvisioningService {
                 // cannot be granted a role that does not exist yet, and the
                 // client step now grants the roles each client declares.
                 appliedSteps.addAll(roleReconciler.reconcile(realm.name(), realm.realmRoles()));
+
+                // Before clients, because a client's protocol mapper is only
+                // worth anything if the attribute it maps can be stored at all.
+                // Declared second and mapped first, a token carries an empty
+                // claim and every reader of it looks broken instead.
+                appliedSteps.addAll(userProfileReconciler.reconcile(
+                        realm.name(), realm.userProfileAttributes()));
 
                 if (realm.clients() != null) {
                     for (ClientDeclaration clientDecl : realm.clients()) {

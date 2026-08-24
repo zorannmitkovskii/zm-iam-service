@@ -21,6 +21,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import org.keycloak.admin.client.resource.UserProfileResource;
+import org.keycloak.representations.userprofile.config.UPAttribute;
+import org.keycloak.representations.userprofile.config.UPAttributePermissions;
+import org.keycloak.representations.userprofile.config.UPConfig;
+import java.util.Set;
 
 /**
  * Thin typed facade over the Keycloak Admin REST API — the ONLY place in
@@ -384,5 +389,77 @@ public class KeycloakAdminApi {
             log.info("[KeycloakAdminApi] Assigned roles {} to user id={} realm='{}'",
                     roleNames, userId, realmName);
         }
+    }
+    /**
+     * Ensures every named attribute is declared on the realm's user profile.
+     *
+     * <p>Nothing else in this service touched the user profile, which is why
+     * attributes could be written, answered 204, and simply not be there
+     * afterwards: Keycloak's declarative profile discards anything it does not
+     * know. That fault emptied the old eventIds claim for every user, and it
+     * was doing the same to orgId.
+     *
+     * <p>Additive. Attributes are removed only when they were declared by a
+     * manifest and have since been dropped from it — the caller decides that;
+     * this method never deletes a built-in, and username/email/firstName/
+     * lastName are Keycloak's own.
+     *
+     * @return the names actually added, empty when the profile already had them
+     */
+    public List<String> ensureUserProfileAttributes(String realmName, List<String> attributeNames) {
+        if (attributeNames == null || attributeNames.isEmpty()) {
+            return List.of();
+        }
+        try (Keycloak admin = session.client()) {
+            UserProfileResource profile = admin.realm(realmName).users().userProfile();
+            UPConfig config = profile.getConfiguration();
+
+            List<String> existing = config.getAttributes() == null
+                    ? new ArrayList<>()
+                    : config.getAttributes().stream().map(UPAttribute::getName).toList();
+
+            List<UPAttribute> attributes = config.getAttributes() == null
+                    ? new ArrayList<>()
+                    : new ArrayList<>(config.getAttributes());
+
+            List<String> added = new ArrayList<>();
+            for (String name : attributeNames) {
+                if (existing.contains(name)) {
+                    continue;
+                }
+                attributes.add(declare(name));
+                added.add(name);
+            }
+
+            if (added.isEmpty()) {
+                return List.of();
+            }
+
+            config.setAttributes(attributes);
+            profile.update(config);
+            log.info("[KeycloakAdminApi] Declared user-profile attributes {} on realm '{}'",
+                    added, realmName);
+            return added;
+        }
+    }
+
+    /**
+     * A custom attribute both the admin API and the user may write.
+     *
+     * <p>Not required, and no validators: these carry ids and flags the product
+     * sets, so a validation rule here would reject a perfectly good write from
+     * a service and be invisible until it did.
+     */
+    private static UPAttribute declare(String name) {
+        UPAttribute attribute = new UPAttribute();
+        attribute.setName(name);
+        attribute.setMultivalued(false);
+
+        UPAttributePermissions permissions = new UPAttributePermissions();
+        permissions.setView(Set.of("admin", "user"));
+        permissions.setEdit(Set.of("admin"));
+        attribute.setPermissions(permissions);
+
+        return attribute;
     }
 }

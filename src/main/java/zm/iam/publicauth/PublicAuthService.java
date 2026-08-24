@@ -16,6 +16,7 @@ import zm.iam.publicauth.dto.ChangePasswordRequest;
 import zm.iam.publicauth.dto.LoginRequest;
 import zm.iam.publicauth.dto.PasswordResetConfirmDto;
 import zm.iam.publicauth.dto.PasswordResetRequestDto;
+import zm.iam.publicauth.dto.AccountType;
 import zm.iam.publicauth.dto.RegisterRequest;
 import zm.iam.publicauth.dto.TokenResponseDto;
 import zm.iam.publicauth.dto.VerifyEmailRequest;
@@ -23,6 +24,7 @@ import zm.iam.publicauth.dto.VerifyEmailRequest;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Coordinator for the public auth flows: register, verify email, login,
@@ -48,22 +50,38 @@ public class PublicAuthService {
      *  provisioned temporary password. */
     private static final String MUST_CHANGE_PASSWORD_ATTR = "mustChangePassword";
 
+    /**
+     * What the account is <em>going to be</em>, held between signing up and
+     * verifying the email. Removed once acted on — an instruction that has
+     * already been carried out and still sits there is one the next reader
+     * cannot distinguish from a pending one.
+     */
+    private static final String ATTR_PENDING_ACCOUNT_TYPE = "pendingAccountType";
+    private static final String ATTR_PENDING_ORG_NAME = "pendingOrganizationName";
+
+    /** The organization the account acts for. The claim every product reads to
+     *  scope data to a tenant. */
+    private static final String ATTR_ORG_ID = "orgId";
+
     private final KeycloakAdminApi keycloak;
     private final VerificationCodeService codes;
     private final AuthNotificationGateway notifications;
     private final KeycloakTokenClient tokens;
     private final AuditService audit;
+    private final OrganizationServiceClient organizations;
 
     public PublicAuthService(KeycloakAdminApi keycloak,
                               VerificationCodeService codes,
                               AuthNotificationGateway notifications,
                               KeycloakTokenClient tokens,
-                              AuditService audit) {
+                              AuditService audit,
+                              OrganizationServiceClient organizations) {
         this.keycloak = keycloak;
         this.codes = codes;
         this.notifications = notifications;
         this.tokens = tokens;
         this.audit = audit;
+        this.organizations = organizations;
     }
 
     // ── Register ─────────────────────────────────────────────────
@@ -75,9 +93,24 @@ public class PublicAuthService {
             throw new DuplicateResourceException(
                     "A user with email '" + req.email() + "' already exists in realm '" + realm + "'");
         }
+        if (req.isOrganizer() && (req.organizationName() == null || req.organizationName().isBlank())) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR,
+                    "An organizer account needs the organization's name.");
+        }
+
         String userId = keycloak.createUser(realm, req.email(),
                 req.firstName(), req.lastName(), /* enabled */ false);
         keycloak.resetUserPassword(realm, userId, req.password(), /* temporary */ false);
+
+        // Remembered on the user rather than asked for again at verification.
+        // The choice belongs to the moment somebody made it; asking the client
+        // to resend it means a client that forgets silently downgrades an
+        // agency to a personal account.
+        keycloak.patchUserAttributes(realm, userId,
+                Map.of(ATTR_PENDING_ACCOUNT_TYPE, List.of(req.accountTypeOrDefault().name()),
+                        ATTR_PENDING_ORG_NAME, List.of(
+                                req.organizationName() == null ? "" : req.organizationName().trim())),
+                null, null);
 
         String code = codes.issue(realm, req.email(), VerificationPurpose.EMAIL_VERIFY);
         notifications.emailVerification(realm, req.email(), code);
@@ -104,8 +137,13 @@ public class PublicAuthService {
         keycloak.setUserEnabled(realm, user.getId(), true);
         keycloak.addUserRealmRoles(realm, user.getId(), List.of("USER"));
 
+        AccountType accountType = accountTypeOf(user);
+        if (accountType == AccountType.ORGANIZER) {
+            completeOrganizerSetup(realm, user);
+        }
+
         audit.record(auditEvt(req.email(), realm, "VERIFY_EMAIL", true,
-                Map.of("userId", user.getId())));
+                Map.of("userId", user.getId(), "accountType", accountType.name())));
 
         // NOTE: Log user in with a temporary password grant IS the natural
         // move here, but we'd need the plaintext password — verify-email
@@ -115,6 +153,63 @@ public class PublicAuthService {
         // request body carried the password again (Ivy today does re-post).
         // For MVP, return an empty token response so FE calls /login next.
         return new TokenResponseDto(null, null, null, 0, "verified");
+    }
+
+    /**
+     * Gives an organizer the organization they signed up for.
+     *
+     * <p>Three things, in this order: create the organization, write its id onto
+     * the user, then grant ORG_ADMIN. The order is what makes a failure
+     * survivable — a user with ORG_ADMIN and no {@code orgId} would carry a
+     * permission over an organization that does not exist, and every check that
+     * reads the claim would refuse them anyway while the role suggested
+     * otherwise.
+     *
+     * <p>ORG_ADMIN rather than ORGANIZER, and the difference matters: ORGANIZER
+     * is any member of an organization, ORG_ADMIN is whoever runs it. The person
+     * signing up <em>is</em> the agency, so they get the one that can see its
+     * money and add its staff.
+     *
+     * <p>The pending attributes are removed afterwards. Left behind, they are an
+     * instruction that has already been carried out, and the next person to read
+     * them cannot tell.
+     */
+    private void completeOrganizerSetup(String realm, UserRepresentation user) {
+        String name = firstAttribute(user, ATTR_PENDING_ORG_NAME)
+                .filter(value -> !value.isBlank())
+                .orElseGet(() -> defaultOrganizationName(user));
+
+        UUID orgId = organizations.createOrganization(name);
+
+        keycloak.patchUserAttributes(realm, user.getId(),
+                Map.of(ATTR_ORG_ID, List.of(orgId.toString())), null, null);
+        keycloak.addUserRealmRoles(realm, user.getId(), List.of("ORG_ADMIN"));
+
+        keycloak.removeUserAttribute(realm, user.getId(), ATTR_PENDING_ACCOUNT_TYPE);
+        keycloak.removeUserAttribute(realm, user.getId(), ATTR_PENDING_ORG_NAME);
+
+        log.info("[PublicAuth] organizer {} now administers organization {}", user.getId(), orgId);
+    }
+
+    /** A name is required at signup, so this is the fallback for an account
+     *  created before that was true rather than an invitation to skip it. */
+    private static String defaultOrganizationName(UserRepresentation user) {
+        String first = user.getFirstName() == null ? "" : user.getFirstName().trim();
+        String last = user.getLastName() == null ? "" : user.getLastName().trim();
+        String person = (first + " " + last).trim();
+        return person.isBlank() ? user.getEmail() : person;
+    }
+
+    private static AccountType accountTypeOf(UserRepresentation user) {
+        return AccountType.orPersonal(firstAttribute(user, ATTR_PENDING_ACCOUNT_TYPE).orElse(null));
+    }
+
+    private static Optional<String> firstAttribute(UserRepresentation user, String key) {
+        if (user.getAttributes() == null) {
+            return Optional.empty();
+        }
+        List<String> values = user.getAttributes().get(key);
+        return values == null || values.isEmpty() ? Optional.empty() : Optional.of(values.get(0));
     }
 
     // ── Login ─────────────────────────────────────────────────────
