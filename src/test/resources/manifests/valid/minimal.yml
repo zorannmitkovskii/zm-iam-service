@@ -1,0 +1,7 @@
+serviceId: tiny-svc
+manifestVersion: 1
+realms:
+  - name: tiny-realm
+    clients:
+      - clientId: tiny-frontend
+        type: PUBLIC

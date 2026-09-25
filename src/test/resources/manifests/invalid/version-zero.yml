@@ -1,0 +1,6 @@
+# manifestVersion must be positive (@Positive).
+serviceId: zero-svc
+manifestVersion: 0
+realms:
+  - name: r
+    clients: []

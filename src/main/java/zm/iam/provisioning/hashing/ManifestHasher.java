@@ -1,7 +1,7 @@
 package zm.iam.provisioning.hashing;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import zm.iam.provisioning.dto.ServiceProvisioningManifest;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
@@ -46,7 +46,7 @@ public class ManifestHasher {
         byte[] canonicalBytes;
         try {
             canonicalBytes = canonical.writeValueAsBytes(manifest);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("Could not canonicalise manifest for hashing", e);
         }
 

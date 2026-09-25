@@ -1,9 +1,7 @@
 package zm.iam.provisioning.hashing;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.databind.MapperFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import tools.jackson.databind.ObjectMapper;
+import zm.iam.provisioning.ManifestObjectMappers;
 import zm.iam.provisioning.dto.ClientDeclaration;
 import zm.iam.provisioning.dto.ClientType;
 import zm.iam.provisioning.dto.RealmDeclaration;
@@ -87,11 +85,17 @@ class ManifestHasherTest {
                         List.of("USER"), null, null)));
     }
 
+    /**
+     * The production mapper, not a copy of it.
+     *
+     * <p>This used to rebuild the canonical settings by hand, which made the
+     * test able to pass while production hashed different bytes — exactly the
+     * drift a digest test exists to catch. It also hid a real difference:
+     * production elides nulls with {@code withValueInclusion}, deliberately
+     * narrower than {@code ALL_NON_NULL}, because the wider setting would also
+     * drop nulls inside maps and lists and change the signed bytes.
+     */
     private static ObjectMapper canonicalMapper() {
-        ObjectMapper m = new ObjectMapper();
-        m.configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
-        m.configure(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY, true);
-        m.setSerializationInclusion(JsonInclude.Include.NON_NULL);
-        return m;
+        return new ManifestObjectMappers().manifestCanonicalMapper();
     }
 }

@@ -1,8 +1,8 @@
 package zm.iam.provisioning;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.exc.MismatchedInputException;
-import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.exc.MismatchedInputException;
+import tools.jackson.databind.exc.UnrecognizedPropertyException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validator;
@@ -41,7 +41,7 @@ public class ManifestParser {
 
     /**
      * Parse + validate. Any structural failure surfaces as a
-     * {@link com.fasterxml.jackson.core.JsonProcessingException} — bubble
+     * {@link tools.jackson.core.JacksonException} — bubble
      * up to Spring's HttpMessageNotReadableException handling. Any Bean
      * Validation failure surfaces as {@link ConstraintViolationException}.
      */

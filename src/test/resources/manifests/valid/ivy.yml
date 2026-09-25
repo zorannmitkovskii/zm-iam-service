@@ -1,0 +1,22 @@
+serviceId: ivy-events-be
+manifestVersion: 3
+realms:
+  - name: event-app
+    settings:
+      loginWithEmailAllowed: true
+      registrationAllowed: false
+      resetPasswordAllowed: true
+    clients:
+      - clientId: eventFE
+        type: PUBLIC
+        pkce: true
+        redirectUris:
+          - "https://ivyevents.mk/*"
+        webOrigins: ["+"]
+    realmRoles: [USER, ADMIN]
+  - name: zm-services
+    clients:
+      - clientId: ivy-events-be-svc
+        type: CONFIDENTIAL
+        serviceAccountsEnabled: true
+        serviceAccountRoles: [iam-client]

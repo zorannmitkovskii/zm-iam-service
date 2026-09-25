@@ -1,0 +1,5 @@
+serviceId: EventsBE
+manifestVersion: 1
+realms:
+  - name: r
+    clients: []

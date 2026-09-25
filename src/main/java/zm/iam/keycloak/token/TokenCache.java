@@ -1,7 +1,8 @@
 package zm.iam.keycloak.token;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
@@ -170,7 +171,7 @@ public class TokenCache {
         TokenResponse parsed;
         try {
             parsed = objectMapper.readValue(response.body(), TokenResponse.class);
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("Could not parse token response as JSON", e);
         }
         if (parsed.accessToken == null || parsed.accessToken.isBlank()) {

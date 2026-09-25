@@ -1,7 +1,8 @@
 package zm.iam.publicauth;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -96,7 +97,7 @@ public class KeycloakTokenClient {
         }
         try {
             return mapper.readValue(resp.body(), TokenResponse.class);
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             throw new PasswordGrantException("Could not parse token response", 200);
         }
     }

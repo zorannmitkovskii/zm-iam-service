@@ -1,0 +1,8 @@
+# The same realm declared twice (@AssertTrue realmNamesUnique).
+serviceId: dup-svc
+manifestVersion: 1
+realms:
+  - name: same-realm
+    clients: []
+  - name: same-realm
+    clients: []

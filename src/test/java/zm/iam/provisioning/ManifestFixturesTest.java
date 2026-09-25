@@ -1,9 +1,7 @@
 package zm.iam.provisioning;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.exc.UnrecognizedPropertyException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -29,7 +27,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class ManifestFixturesTest {
 
-    private final ObjectMapper yaml = strict(new ObjectMapper(new YAMLFactory()));
+    /*
+      The production YAML mapper, not a copy of its settings. These fixtures
+      are the contract for what the service accepts, so the mapper under test
+      has to be the one that ships — a local rebuild of "strict" could fall
+      behind ManifestObjectMappers and still go green.
+    */
+    private final ObjectMapper yaml = new ManifestObjectMappers().manifestYamlMapper();
     private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 
     // ── valid/ ──────────────────────────────────────────────────
@@ -85,9 +89,4 @@ class ManifestFixturesTest {
         }
     }
 
-    private static ObjectMapper strict(ObjectMapper m) {
-        m.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
-        m.configure(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES, true);
-        return m;
-    }
 }

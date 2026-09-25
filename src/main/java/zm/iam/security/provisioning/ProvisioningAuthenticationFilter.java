@@ -50,6 +50,19 @@ import java.util.Optional;
 @Component
 public class ProvisioningAuthenticationFilter extends OncePerRequestFilter {
 
+    /**
+     * How much of a request body is kept for the serviceId peek.
+     *
+     * <p>Spring 7 dropped the unbounded ContentCachingRequestWrapper
+     * constructor, so the limit is now explicit. One megabyte is far above any
+     * real manifest and still bounds what one request can pin in memory.
+     *
+     * <p>It matters that this is generous: the cached bytes are what
+     * serviceIdExtractor reads, and a body truncated before the serviceId
+     * field would be denied with a 400 that looks like a client error.
+     */
+    private static final int MAX_CACHED_BODY_BYTES = 1024 * 1024;
+
     public static final String HEADER = "X-Provisioning-Token";
 
     private final TokenRegistry tokenRegistry;
@@ -132,7 +145,8 @@ public class ProvisioningAuthenticationFilter extends OncePerRequestFilter {
 
         // POST needs the body; wrap once so the controller sees the same
         // bytes. GET path variable is enough on its own.
-        ContentCachingRequestWrapper wrapped = new ContentCachingRequestWrapper(request);
+        ContentCachingRequestWrapper wrapped =
+                new ContentCachingRequestWrapper(request, MAX_CACHED_BODY_BYTES);
         if (HttpMethod.POST.matches(request.getMethod())) {
             // Force read so the cache is populated before we peek.
             wrapped.getInputStream().readAllBytes();

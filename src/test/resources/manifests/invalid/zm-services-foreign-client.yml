@@ -1,0 +1,7 @@
+serviceId: ivy-events-be
+manifestVersion: 1
+realms:
+  - name: zm-services
+    clients:
+      - clientId: evil-client
+        type: CONFIDENTIAL

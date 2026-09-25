@@ -76,7 +76,7 @@ public class AuditController {
             TargetType targetType,
             String targetId,
             String operation,
-            com.fasterxml.jackson.databind.JsonNode detail,
+            tools.jackson.databind.JsonNode detail,
             boolean success) {
         static AuditRow from(AuditLogEntry e) {
             return new AuditRow(

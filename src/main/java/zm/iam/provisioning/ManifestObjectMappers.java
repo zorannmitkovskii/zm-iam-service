@@ -1,10 +1,13 @@
 package zm.iam.provisioning;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.MapperFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.MapperFeature;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.SerializationFeature;
+import tools.jackson.databind.cfg.MapperBuilder;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.dataformat.yaml.YAMLMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -34,7 +37,7 @@ public class ManifestObjectMappers {
      *  like {@link zm.iam.keycloak.KeycloakAdminSession}. */
     @Bean(name = "manifestJsonMapper", defaultCandidate = false)
     public ObjectMapper manifestJsonMapper() {
-        return strict(new ObjectMapper());
+        return strict(JsonMapper.builder()).build();
     }
 
     /** Strict YAML mapper for reading manifest bodies as
@@ -42,25 +45,37 @@ public class ManifestObjectMappers {
      *  {@code src/main/resources/iam-manifest.yml}. */
     @Bean(name = "manifestYamlMapper", defaultCandidate = false)
     public ObjectMapper manifestYamlMapper() {
-        return strict(new ObjectMapper(new YAMLFactory()));
+        return strict(YAMLMapper.builder()).build();
     }
 
     /** Canonical mapper — used ONLY for hashing. Keys sorted, empty
      *  values elided so cosmetic edits don't change the digest. */
     @Bean(name = "manifestCanonicalMapper", defaultCandidate = false)
     public ObjectMapper manifestCanonicalMapper() {
-        ObjectMapper m = new ObjectMapper();
-        m.configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
-        m.configure(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY, true);
-        m.configure(SerializationFeature.INDENT_OUTPUT, false);
-        m.setSerializationInclusion(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL);
-        return m;
+        // withValueInclusion rather than the ALL_NON_NULL constant: the old
+        // setSerializationInclusion set the value inclusion only. ALL_NON_NULL
+        // would also elide nulls inside maps and lists, which changes the
+        // bytes — and these bytes are what the digest is taken over.
+        return JsonMapper.builder()
+                .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true)
+                .configure(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY, true)
+                .configure(SerializationFeature.INDENT_OUTPUT, false)
+                .changeDefaultPropertyInclusion(v -> v.withValueInclusion(JsonInclude.Include.NON_NULL))
+                .build();
     }
 
-    private static ObjectMapper strict(ObjectMapper m) {
-        m.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
-        m.configure(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES, true);
-        m.configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, false);
-        return m;
+    /**
+     * The strict settings, applied to whichever builder is handed in.
+     *
+     * <p>Generic over the builder rather than taking a mapper: Jackson 3's
+     * ObjectMapper is immutable, so settings can only be applied before the
+     * build. The recursive bound is what lets one method serve both the JSON
+     * and the YAML builder and still return the caller's own type.
+     */
+    private static <B extends MapperBuilder<?, B>> B strict(B builder) {
+        return builder
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true)
+                .configure(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES, true)
+                .configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, false);
     }
 }
