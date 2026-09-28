@@ -147,7 +147,35 @@ class ManifestValidationTest {
                 .anyMatch(p -> p.contains("clientIdEnvRef"));
     }
 
+    @Test
+    @DisplayName("Session lifespans must be positive")
+    void sessionLifespansMustBePositive() {
+        var m = withSettings(new RealmSettings(null, null, null, null, null, 0, -1));
+        assertThat(paths(validator.validate(m)))
+                .anyMatch(p -> p.contains("ssoSessionIdleTimeoutSeconds"))
+                .anyMatch(p -> p.contains("ssoSessionMaxLifespanSeconds"));
+    }
+
+    @Test
+    @DisplayName("A session cannot idle longer than it may live")
+    void idleMustNotExceedMax() {
+        var m = withSettings(new RealmSettings(null, null, null, null, null, 7200, 3600));
+        assertThat(paths(validator.validate(m))).anyMatch(p -> p.contains("sessionIdleWithinMax"));
+    }
+
+    @Test
+    @DisplayName("Valid lifespans, or only one of them, pass")
+    void validLifespansPass() {
+        assertThat(validator.validate(withSettings(new RealmSettings(null, null, null, null, null, 604800, 2592000)))).isEmpty();
+        assertThat(validator.validate(withSettings(new RealmSettings(null, null, null, null, null, 604800, null)))).isEmpty();
+    }
+
     // ── helpers ──────────────────────────────────────────────────
+
+    private static ServiceProvisioningManifest withSettings(RealmSettings settings) {
+        return new ServiceProvisioningManifest("svc", 1,
+                List.of(new RealmDeclaration("app", settings, null, null, null, null)));
+    }
 
     private static ServiceProvisioningManifest manifest(String serviceId, int version) {
         return new ServiceProvisioningManifest(serviceId, version, List.of(realm("app")));

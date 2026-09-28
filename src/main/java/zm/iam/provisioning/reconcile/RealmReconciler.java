@@ -55,6 +55,8 @@ public class RealmReconciler {
         if (s.resetPasswordAllowed() != null)  target.setResetPasswordAllowed(s.resetPasswordAllowed());
         if (s.rememberMe() != null)            target.setRememberMe(s.rememberMe());
         if (s.verifyEmail() != null)           target.setVerifyEmail(s.verifyEmail());
+        if (s.ssoSessionIdleTimeoutSeconds() != null) target.setSsoSessionIdleTimeout(s.ssoSessionIdleTimeoutSeconds());
+        if (s.ssoSessionMaxLifespanSeconds() != null) target.setSsoSessionMaxLifespan(s.ssoSessionMaxLifespanSeconds());
     }
 
     private static List<String> diffSettings(RealmRepresentation existing, RealmSettings decl) {
@@ -70,6 +72,13 @@ public class RealmReconciler {
             diffs.add("rememberMe");
         if (decl.verifyEmail() != null && !decl.verifyEmail().equals(existing.isVerifyEmail()))
             diffs.add("verifyEmail");
+        // A realm Keycloak returns without a value (null) differs from any declared one.
+        if (decl.ssoSessionIdleTimeoutSeconds() != null
+                && !decl.ssoSessionIdleTimeoutSeconds().equals(existing.getSsoSessionIdleTimeout()))
+            diffs.add("ssoSessionIdleTimeout");
+        if (decl.ssoSessionMaxLifespanSeconds() != null
+                && !decl.ssoSessionMaxLifespanSeconds().equals(existing.getSsoSessionMaxLifespan()))
+            diffs.add("ssoSessionMaxLifespan");
         return diffs;
     }
 }

@@ -6,6 +6,8 @@ realms:
       loginWithEmailAllowed: true
       registrationAllowed: false
       resetPasswordAllowed: true
+      ssoSessionIdleTimeoutSeconds: 604800
+      ssoSessionMaxLifespanSeconds: 2592000
     clients:
       - clientId: eventFE
         type: PUBLIC

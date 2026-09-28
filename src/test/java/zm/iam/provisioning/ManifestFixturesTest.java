@@ -62,7 +62,8 @@ class ManifestFixturesTest {
             "invalid/serviceId-uppercase.yml,        serviceId",
             "invalid/version-zero.yml,               manifestVersion",
             "invalid/duplicate-realms.yml,           realmNamesUnique",
-            "invalid/zm-services-foreign-client.yml, zmServicesScopeRespected"
+            "invalid/zm-services-foreign-client.yml, zmServicesScopeRespected",
+            "invalid/session-idle-exceeds-max.yml,      sessionIdleWithinMax"
     })
     void invalidFixturesFailWithExpectedPath(String fixture, String expectedPathFragment) throws Exception {
         var m = load(fixture);
