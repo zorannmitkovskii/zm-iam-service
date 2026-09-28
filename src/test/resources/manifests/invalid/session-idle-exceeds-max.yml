@@ -1,0 +1,9 @@
+# A session cannot idle for longer than it may live (RealmSettings @AssertTrue).
+serviceId: session-svc
+manifestVersion: 1
+realms:
+  - name: r
+    settings:
+      ssoSessionIdleTimeoutSeconds: 7200
+      ssoSessionMaxLifespanSeconds: 3600
+    clients: []
