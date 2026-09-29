@@ -69,19 +69,22 @@ public class PublicAuthService {
     private final KeycloakTokenClient tokens;
     private final AuditService audit;
     private final OrganizationServiceClient organizations;
+    private final PublicAuthProperties properties;
 
     public PublicAuthService(KeycloakAdminApi keycloak,
                               VerificationCodeService codes,
                               AuthNotificationGateway notifications,
                               KeycloakTokenClient tokens,
                               AuditService audit,
-                              OrganizationServiceClient organizations) {
+                              OrganizationServiceClient organizations,
+                              PublicAuthProperties properties) {
         this.keycloak = keycloak;
         this.codes = codes;
         this.notifications = notifications;
         this.tokens = tokens;
         this.audit = audit;
         this.organizations = organizations;
+        this.properties = properties;
     }
 
     // ── Register ─────────────────────────────────────────────────
@@ -159,16 +162,18 @@ public class PublicAuthService {
      * Gives an organizer the organization they signed up for.
      *
      * <p>Three things, in this order: create the organization, write its id onto
-     * the user, then grant ORG_ADMIN. The order is what makes a failure
-     * survivable — a user with ORG_ADMIN and no {@code orgId} would carry a
+     * the user, then grant the owner role. The order is what makes a failure
+     * survivable — a user with the owner role and no {@code orgId} would carry a
      * permission over an organization that does not exist, and every check that
      * reads the claim would refuse them anyway while the role suggested
      * otherwise.
      *
-     * <p>ORG_ADMIN rather than ORGANIZER, and the difference matters: ORGANIZER
-     * is any member of an organization, ORG_ADMIN is whoever runs it. The person
-     * signing up <em>is</em> the agency, so they get the one that can see its
-     * money and add its staff.
+     * <p>The owner role rather than the member one: the person signing up
+     * <em>is</em> the agency, so they get the role that can see its money and
+     * add its staff. Its name is the realm's
+     * ({@link PublicAuthProperties#organizerOwnerRoleFor}) — Ivy calls it
+     * {@code AGENCY}, and granting the platform default {@code ORG_ADMIN} there
+     * left every new agency acting as a plain user.
      *
      * <p>The pending attributes are removed afterwards. Left behind, they are an
      * instruction that has already been carried out, and the next person to read
@@ -183,7 +188,7 @@ public class PublicAuthService {
 
         keycloak.patchUserAttributes(realm, user.getId(),
                 Map.of(ATTR_ORG_ID, List.of(orgId.toString())), null, null);
-        keycloak.addUserRealmRoles(realm, user.getId(), List.of("ORG_ADMIN"));
+        keycloak.addUserRealmRoles(realm, user.getId(), List.of(properties.organizerOwnerRoleFor(realm)));
 
         keycloak.removeUserAttribute(realm, user.getId(), ATTR_PENDING_ACCOUNT_TYPE);
         keycloak.removeUserAttribute(realm, user.getId(), ATTR_PENDING_ORG_NAME);

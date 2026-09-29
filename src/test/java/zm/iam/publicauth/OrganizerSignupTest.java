@@ -55,8 +55,10 @@ class OrganizerSignupTest {
         notifications = mock(AuthNotificationGateway.class);
         organizations = mock(OrganizationServiceClient.class);
 
+        PublicAuthProperties properties = new PublicAuthProperties();
+        properties.setOrganizerOwnerRoles(Map.of(REALM, "AGENCY"));
         service = new PublicAuthService(keycloak, codes, notifications,
-                mock(KeycloakTokenClient.class), mock(AuditService.class), organizations);
+                mock(KeycloakTokenClient.class), mock(AuditService.class), organizations, properties);
 
         when(keycloak.findUserByEmail(REALM, EMAIL)).thenReturn(Optional.empty());
         when(keycloak.createUser(eq(REALM), eq(EMAIL), any(), any(), eq(false))).thenReturn(USER_ID);
@@ -111,7 +113,7 @@ class OrganizerSignupTest {
     // ── verifying ────────────────────────────────────────────────────────
 
     @Test
-    @DisplayName("Verifying an organizer creates the organization and makes them its admin")
+    @DisplayName("Verifying an organizer creates the organization and makes them its owner, by the realm's name for it")
     void verifyingAnOrganizerBuildsTheAgency() {
         UUID orgId = UUID.randomUUID();
         givenPendingUser("ORGANIZER", "Ивy Агенција");
@@ -122,9 +124,10 @@ class OrganizerSignupTest {
         verify(organizations).createOrganization("Ивy Агенција");
         assertThat(attributesSetOn(USER_ID)).containsEntry("orgId", List.of(orgId.toString()));
 
-        // ORG_ADMIN, not ORGANIZER: the person signing up IS the agency, so
-        // they get the role that can see its money and add its staff.
-        verify(keycloak).addUserRealmRoles(REALM, USER_ID, List.of("ORG_ADMIN"));
+        // The owner role, and in Ivy's realm its name is AGENCY. Granting the
+        // platform default there left a new agency acting as a plain user.
+        verify(keycloak).addUserRealmRoles(REALM, USER_ID, List.of("AGENCY"));
+        verify(keycloak, never()).addUserRealmRoles(REALM, USER_ID, List.of("ORG_ADMIN"));
         verify(keycloak).addUserRealmRoles(REALM, USER_ID, List.of("USER"));
     }
 
@@ -143,14 +146,14 @@ class OrganizerSignupTest {
     }
 
     @Test
-    @DisplayName("Verifying a personal account touches no registry and grants no ORG_ADMIN")
+    @DisplayName("Verifying a personal account touches no registry and grants no owner role")
     void verifyingPersonalCreatesNoOrganization() {
         givenPendingUser("PERSONAL", "");
 
         service.verifyEmail(REALM, new VerifyEmailRequest(EMAIL, "123456", null));
 
         verify(organizations, never()).createOrganization(anyString());
-        verify(keycloak, never()).addUserRealmRoles(REALM, USER_ID, List.of("ORG_ADMIN"));
+        verify(keycloak, never()).addUserRealmRoles(REALM, USER_ID, List.of("AGENCY"));
         verify(keycloak).addUserRealmRoles(REALM, USER_ID, List.of("USER"));
     }
 
@@ -165,9 +168,21 @@ class OrganizerSignupTest {
         assertThatThrownBy(() -> service.verifyEmail(REALM, new VerifyEmailRequest(EMAIL, "123456", null)))
                 .isInstanceOf(OrganizationServiceClient.OrganizationServiceUnavailableException.class);
 
-        // ORG_ADMIN over an organization that does not exist is a permission
-        // every check would refuse anyway, while the role says otherwise.
-        verify(keycloak, never()).addUserRealmRoles(REALM, USER_ID, List.of("ORG_ADMIN"));
+        // An owner role over an organization that does not exist is a
+        // permission every check would refuse anyway, while the role says otherwise.
+        verify(keycloak, never()).addUserRealmRoles(REALM, USER_ID, List.of("AGENCY"));
+    }
+
+    @Test
+    @DisplayName("A realm that names no owner role gets the platform default, ORG_ADMIN")
+    void unmappedRealmsKeepTheDefaultOwnerRole() {
+        PublicAuthProperties properties = new PublicAuthProperties();
+
+        assertThat(properties.organizerOwnerRoleFor("menu-app")).isEqualTo("ORG_ADMIN");
+        assertThat(properties.organizerOwnerRoleFor(null)).isEqualTo("ORG_ADMIN");
+
+        properties.setOrganizerOwnerRoles(Map.of("event-app", " AGENCY "));
+        assertThat(properties.organizerOwnerRoleFor("event-app")).isEqualTo("AGENCY");
     }
 
     // ── plumbing ─────────────────────────────────────────────────────────

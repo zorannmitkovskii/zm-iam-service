@@ -99,6 +99,10 @@ iam:
   public-auth:
     realm-client-ids:
       event-app: ${IAM_EVENT_APP_CLIENT_ID:eventFE}
+    # The role an organizer signup makes its owner, per realm. Ivy's agency
+    # owner is AGENCY; realms not listed get ORG_ADMIN.
+    organizer-owner-roles:
+      event-app: ${IAM_EVENT_APP_ORGANIZER_ROLE:AGENCY}
 
   # Route public-auth emails through zm-notification-service (Kafka event)
   # instead of sending inline. Default false = inline EmailSender (safe where
