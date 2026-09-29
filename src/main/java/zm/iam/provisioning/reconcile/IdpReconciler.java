@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * External identity provider reconciliation. Two safety rules:
@@ -28,6 +29,15 @@ import java.util.Optional;
 @Slf4j
 @Component
 public class IdpReconciler {
+
+    /**
+     * Providers that hand over an address they have already verified. For
+     * these Keycloak must trust the email, or it asks a Google user to verify
+     * an address Google verified — through a realm that may have no mail
+     * server, which leaves the sign-in stuck on an error page. The legacy
+     * ivy-events-be initializer set this; the manifest path has to as well.
+     */
+    private static final Set<String> VERIFIED_EMAIL_PROVIDERS = Set.of("google");
 
     private final KeycloakAdminApi keycloak;
     private final EnvVarResolver env;
@@ -93,6 +103,9 @@ public class IdpReconciler {
         target.setAlias(d.alias());
         target.setProviderId(d.type().toLowerCase());
         target.setEnabled(true);
+        if (trustsEmail(d)) {
+            target.setTrustEmail(true);
+        }
         Map<String, String> cfg = target.getConfig() == null ? new HashMap<>()
                                                              : new HashMap<>(target.getConfig());
         cfg.put("clientId", clientId);
@@ -104,9 +117,15 @@ public class IdpReconciler {
                                    IdentityProviderDeclaration d,
                                    String clientId, String clientSecret) {
         if (!Objects.equals(existing.getProviderId(), d.type().toLowerCase())) return true;
+        // Heals a provider an earlier apply left untrusted.
+        if (trustsEmail(d) && !existing.isTrustEmail()) return true;
         Map<String, String> cfg = existing.getConfig() == null ? Map.of() : existing.getConfig();
         if (!Objects.equals(cfg.get("clientId"), clientId)) return true;
         return !Objects.equals(cfg.get("clientSecret"), clientSecret);
+    }
+
+    private static boolean trustsEmail(IdentityProviderDeclaration d) {
+        return VERIFIED_EMAIL_PROVIDERS.contains(d.type().toLowerCase());
     }
 
     /** Thrown BEFORE any Keycloak write when a declared env-ref is unset. */
