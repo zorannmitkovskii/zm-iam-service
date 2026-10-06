@@ -53,10 +53,11 @@
         </dependency>
 
         <!-- Kafka: emit notification events to zm-notification-service (async,
-             non-blocking) instead of sending email inline. -->
+             non-blocking) instead of sending email inline. Boot 4 needs the
+             starter: plain spring-kafka has no KafkaTemplate auto-configuration. -->
         <dependency>
-            <groupId>org.springframework.kafka</groupId>
-            <artifactId>spring-kafka</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-kafka</artifactId>
         </dependency>
 
         <!-- Persistence -->
