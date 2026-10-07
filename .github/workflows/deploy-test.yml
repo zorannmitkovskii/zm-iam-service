@@ -85,7 +85,7 @@ jobs:
               --name ivy-iam \
               --network ivy-net \
               --env-file /opt/ivy-events/env/iam.env \
-              -p 8383:8383 \
+              -p 127.0.0.1:8383:8383 \
               -e SPRING_PROFILES_ACTIVE=test \
               -e SERVER_PORT=8383 \
               -e 'SPRING_APPLICATION_JSON={"iam.public-auth.origin-to-realm":{"test.ivyevents.mk":"event-app"}}' \
