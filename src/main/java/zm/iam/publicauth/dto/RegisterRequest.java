@@ -14,17 +14,11 @@ public record RegisterRequest(
         /** Optional — used if Origin header can't resolve to a realm. */
         String appId,
         /**
-         * Personal or organizer. Absent means {@link AccountType#PERSONAL}, so
-         * an older client that does not send it keeps working and cannot
-         * accidentally create an agency.
+         * Absent means {@link AccountType#PERSONAL}, so an older client that
+         * does not send it keeps working. {@link AccountType#ORGANIZER} is
+         * refused.
          */
-        AccountType accountType,
-        /**
-         * The agency's name. Required for {@link AccountType#ORGANIZER} and
-         * ignored otherwise — an organization with no name is a row nobody can
-         * identify in a registry other products read.
-         */
-        @Size(max = 200) String organizationName
+        AccountType accountType
 ) {
 
     public AccountType accountTypeOrDefault() {

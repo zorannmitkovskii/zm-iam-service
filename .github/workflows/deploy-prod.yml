@@ -30,7 +30,9 @@ jobs:
         with:
           context: .
           push: true
-          tags: zmtechlabs/zm-iam-service:latest
+          tags: |
+            zmtechlabs/zm-iam-service:latest
+            zmtechlabs/zm-iam-service:${{ github.sha }}
 
   deploy:
     runs-on: ubuntu-latest
@@ -52,25 +54,8 @@ jobs:
             echo "🔧 Ensure ivy-net network exists"
             docker network inspect ivy-net >/dev/null 2>&1 || docker network create ivy-net
 
-            echo "🗄️ Ensure iam_db + iam_user exist on shared Postgres"
-            # Idempotent — never touches an existing role/database, only
-            # creates what's missing. Safe against a prod DB with real data.
-            # psql :'var' substitution does NOT work inside DO $$ ... $$
-            # blocks. Use \gexec for both role + database checks.
-            docker exec -i -u postgres "${{ secrets.POSTGRES_CONTAINER_PROD || 'zm-postgres' }}" \
-              psql -U postgres -v ON_ERROR_STOP=1 \
-              -v iam_user="${{ secrets.IAM_DB_USER_PROD || 'iam_user' }}" \
-              -v iam_password="${{ secrets.IAM_DB_PASSWORD_PROD || 'iam_pass' }}" \
-              -v iam_db="${{ secrets.IAM_DB_NAME_PROD || 'iam_db' }}" <<'SQL'
-            SELECT format('CREATE ROLE %I WITH LOGIN PASSWORD %L', :'iam_user', :'iam_password')
-            WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'iam_user')\gexec
-
-            SELECT format('CREATE DATABASE %I OWNER %I', :'iam_db', :'iam_user')
-            WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = :'iam_db')\gexec
-            SQL
-
-            echo "⬇️ Pull latest IAM image"
-            docker pull zmtechlabs/zm-iam-service:latest
+            echo "⬇️ Pull IAM image"
+            docker pull zmtechlabs/zm-iam-service:${{ github.sha }}
 
             echo "🛑 Stop IAM (prod)"
             docker stop ivy-iam || true
@@ -82,9 +67,17 @@ jobs:
             docker run -d \
               --name ivy-iam \
               --network ivy-net \
+              --restart unless-stopped \
               --env-file /opt/ivy-events/env/iam.env \
-              -p 8383:8383 \
+              -p 127.0.0.1:8383:8383 \
               -e SPRING_PROFILES_ACTIVE=prod \
-              zmtechlabs/zm-iam-service:latest
+              -e SERVER_PORT=8383 \
+              -e 'SPRING_APPLICATION_JSON={"iam.public-auth.origin-to-realm":{"ivyevents.mk":"event-app","www.ivyevents.mk":"event-app"}}' \
+              -e IAM_PROVISIONING_SECURITY_ENABLED=false \
+              --health-cmd 'curl -fsS http://localhost:8383/actuator/health/liveness || exit 1' \
+              --health-interval 15s \
+              --health-start-period 45s \
+              --health-retries 5 \
+              zmtechlabs/zm-iam-service:${{ github.sha }}
 
             echo "✅ IAM (prod) deployed successfully"

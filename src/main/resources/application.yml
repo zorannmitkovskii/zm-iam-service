@@ -99,10 +99,6 @@ iam:
   public-auth:
     realm-client-ids:
       event-app: ${IAM_EVENT_APP_CLIENT_ID:eventFE}
-    # The role an organizer signup makes its owner, per realm. Ivy's agency
-    # owner is AGENCY; realms not listed get ORG_ADMIN.
-    organizer-owner-roles:
-      event-app: ${IAM_EVENT_APP_ORGANIZER_ROLE:AGENCY}
 
   # Route public-auth emails through zm-notification-service (Kafka event)
   # instead of sending inline. Default false = inline EmailSender (safe where
@@ -113,19 +109,3 @@ iam:
 # Topic zm-notification-service consumes.
 notification:
   topic: ${NOTIFICATION_TOPIC:zm.notifications.v1}
-
-# ── The business registry (organizer signup) ─────────────────────────
-# Where to create the organization behind an organizer account. Unset means an
-# organizer signup fails loudly at verification, rather than producing an account
-# that looks complete and cannot open a single agency screen.
-org:
-  service:
-    base-url: ${ORG_BASE_URL:}
-    # Client credentials for the services realm. IAM has no service identity of
-    # its own today — it is the thing that provisions them for everyone else —
-    # so this must be pointed at a client that carries org-service's
-    # `org-client` role. Unset means organizer signup fails loudly at
-    # verification; personal signup, login and password reset are unaffected.
-    token-url: ${ORG_TOKEN_URL:}
-    client-id: ${ORG_CLIENT_ID:}
-    client-secret: ${ORG_CLIENT_SECRET:}
